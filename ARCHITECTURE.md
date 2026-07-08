@@ -1,8 +1,8 @@
-# Architecture
+# Workflow
 
-Task Portal is an internal Python application for managing request records. It reads
+This product is an internal Python application for managing request records. It reads
 from and writes back to an Excel workbook stored on SharePoint, surfaces forms and
-dashboards to associates inside Microsoft Teams, and automatically chases pending
+dashboards to associates from a Python dev application, and automatically chases pending
 requests over email. It is designed to run entirely on internal infrastructure with
 no cloud dependencies.
 
@@ -12,31 +12,63 @@ Requests flow top‑down toward Excel; status, dashboards, and reports flow back
 
 ```mermaid
 flowchart TD
-    Teams["<b>Microsoft Teams</b><br/>SPFx tab app — embedded primary UI"]
-    Portal["<b>User access layer</b><br/>Web portal — forms, status, dashboards"]
-    App["<b>Application layer</b><br/>Python web app — business logic, request processing"]
-
-    subgraph Automation["Automation layer — independent Python agents"]
-        direction LR
-        Sync["<b>Sync</b><br/>syncs Excel"]
-        Reminder["<b>Reminder</b><br/>sends emails"]
-        Forms["<b>Forms</b><br/>updates status"]
-        Reporting["<b>Reporting</b><br/>audit reports"]
+    %% Start / high-level flow
+    Start([Start: Project workflow])
+    
+    subgraph Backend["Backend development"]
+      direction TB
+      LocalExcel["Step 1a: Develop backend reading local Excel\n(rapid dev & tests)"]
+      SharePointExcel["Step 1b: Switch backend to SharePoint Excel\n(production data source)"]
     end
 
-    Comm["<b>Communication layer</b><br/>Outlook via PyWin32 — reminder and escalation emails"]
-    Data["<b>Data layer</b><br/>SharePoint Excel — central request repository"]
+    Core["Step 2: Build internal Python functions\n(data access, normalize rows, find upcoming expirations)"]
 
-    Teams --> Portal --> App --> Automation
-    Automation --> Comm --> Data
+    subgraph ManagerUI["Manager workflows"]
+      direction TB
+      ManagerFront["Step 3: Manager frontend\n(view expirations, filter, review lists)"]
+      TriggerRequests["Action: Send update requests to matched employees"]
+    end
 
-    classDef teal fill:#E1F5EE,stroke:#0F6E56,color:#085041;
-    classDef purple fill:#EEEDFE,stroke:#534AB7,color:#3C3489;
-    classDef gray fill:#F1EFE8,stroke:#5F5E5A,color:#444441;
+    subgraph EmployeeUI["Employee workflows"]
+      direction TB
+      EmployeeFront["Step 4: Employee frontend\n(update personal data, respond to requests)"]
+      SubmitUpdate["Action: Submit changes -> triggers backend update"]
+    end
 
-    class Teams,Portal teal;
-    class App,Sync,Reminder,Forms,Reporting purple;
-    class Comm,Data gray;
+    DataPersist["Step 5: Excel persistence & logging\n(update sheet; append notification logs, status, timestamps)"]
+
+    subgraph Automation["Step 6: Agents (automation layer)"]
+      direction LR
+      Sync["Sync agents\n(sync Excel <-> app state)"]
+      Reminder["Reminder agents\n(identify due items, send emails)"]
+      Forms["Forms agents\n(apply form responses, status updates)"]
+      Reporting["Reporting agents\n(audit & operational reports)"]
+    end
+
+    Comm["Communication layer\n(Outlook / email logging / deep links)"]
+    Integrations["Step 7: Integrations\n(SharePoint, Microsoft Teams portal tab)"]
+    End([Done / Deploy to internal infra])
+
+    %% Primary linear flow
+    Start --> LocalExcel --> SharePointExcel --> Core
+    Core --> ManagerFront --> TriggerRequests --> EmployeeFront --> SubmitUpdate --> DataPersist
+    DataPersist --> Automation
+    Automation --> Comm --> DataPersist
+    Automation --> Integrations --> End
+
+    %% Cross links
+    ManagerFront -- "optionally preview logs & agent suggestions" --> Reporting
+    Reminder -- "sends notifications" --> Comm
+    Sync -- "keeps data fresh" --> Core
+    EmployeeFront -- "direct update triggers" --> Forms
+    Forms -- "apply updates to Excel" --> DataPersist
+
+    classDef step fill:#EEEDFE,stroke:#534AB7,color:#3C3489;
+    classDef io fill:#E1F5EE,stroke:#0F6E56,color:#085041;
+    classDef infra fill:#F1EFE8,stroke:#5F5E5A,color:#444441;
+    class LocalExcel,SharePointExcel,Core,ManagerFront,EmployeeFront,DataPersist,Automation,Integrations step;
+    class Comm,End io;
+    class Sync,Reminder,Forms,Reporting infra;
     style Automation fill:none,stroke:#73726c,stroke-dasharray:5 4,color:#73726c;
 ```
 

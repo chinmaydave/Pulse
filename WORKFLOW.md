@@ -72,17 +72,47 @@ flowchart TD
     style Automation fill:none,stroke:#73726c,stroke-dasharray:5 4,color:#73726c;
 ```
 
-## Layers
+## Workflow Steps
 
-**Data layer.** A SharePoint-hosted Excel workbook is the single source of truth for
-request records, user details, due dates, statuses, and reminder tracking. End users
-do not touch the file directly — only designated administrators or managers maintain
-source records.
+### Step 1: Backend development
+- **Step 1a:** Develop backend reading local Excel (rapid dev & tests)
+- **Step 1b:** Switch backend to SharePoint Excel (production data source)
 
-**Application layer.** A Python web application holds the business logic: request
-processing, form submissions, and writing updates back to Excel.
+### Step 2: Build internal Python functions
+- Data access layer
+- Normalize rows
+- Find upcoming expirations
 
-**Automation layer.** Four independent Python agents each own one responsibility:
+### Step 3: Manager workflows
+- **Step 3a:** Manager frontend (view expirations, filter, review lists)
+- **Step 3b:** Action — Send update requests to matched employees
+
+### Step 4: Employee workflows
+- **Step 4a:** Employee frontend (update personal data, respond to requests)
+- **Step 4b:** Action — Submit changes (triggers backend update)
+
+### Step 5: Excel persistence & logging
+- Update sheet with changes
+- Append notification logs
+- Record status and timestamps
+
+### Step 6: Agents (automation layer)
+- **Sync agents:** Sync Excel ↔ app state
+- **Reminder agents:** Identify due items and send emails
+- **Forms agents:** Apply form responses and status updates
+- **Reporting agents:** Audit & operational reports
+
+### Step 7: Integrations
+- SharePoint integration
+- Microsoft Teams portal tab
+
+### Communication & Deployment
+- Communication layer (Outlook / email logging / deep links)
+- Deploy to internal infrastructure
+
+**Automation layer.** 
+
+Four groupings of independent Python agents each own different responsibilities:
 
 | Agent | Responsibility |
 | --- | --- |
@@ -91,31 +121,7 @@ processing, form submissions, and writing updates back to Excel.
 | Forms | Updates request status and stores user responses. |
 | Reporting | Generates operational and audit reports. |
 
-Keeping these as separate agents is also where the longer-term "agentic AI" automation
-is intended to plug in.
-
-**Communication layer.** Integrates with Microsoft Outlook via Python
-(PyWin32 / Outlook client libraries). The Reminder agent sends emails to associates
-and escalation notifications when required; email links deep-link the user straight to
-the relevant form in the portal.
-
-**User access layer.** An internal web portal lets users view assigned requests,
-complete forms, track submission status, and access dashboards and reports.
-
-**Microsoft Teams integration.** The portal is published as a Microsoft Teams tab
-application, built with the SharePoint Framework (SPFx) as a custom installable app.
-Users reach the solution directly inside Teams with no separate URL. Teams is the
-primary interface, while all processing stays within the Python application and
-internal infrastructure, and SharePoint Excel remains the underlying data store.
-
-## Team ownership
-
-| Owner | Area |
-| --- | --- |
-| Colin Bertrand | Agentic AI development |
-| Chinmay Dave | Python development |
-| Liam Ben-Zvi | Outlook and Teams app integration |
-| Kavit Timbadia | Testing, documentation |
+These groups are intended to have multiple agents to help automate the overall process.
 
 ## Editing this diagram
 

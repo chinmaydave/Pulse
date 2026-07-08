@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ record.request_id }}{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <p class="eyebrow">{{ record.category }} / {{ record.source_system }}</p>
+    <h1>{{ record.request_id }}: {{ record.title }}</h1>
+  </div>
+  <span class="status">{{ record.status }}</span>
+</section>
+
+<section class="detail-grid">
+  <div class="panel">
+    <h2>Request details</h2>
+    <dl>
+      <dt>Assigned to</dt><dd>{{ record.assigned_to }}</dd>
+      <dt>Email</dt><dd>{{ record.associate_email }}</dd>
+      <dt>Manager</dt><dd>{{ record.manager_email }}</dd>
+      <dt>Due date</dt><dd class="{{ 'overdue' if record.is_overdue else '' }}">{{ record.due_date.strftime('%Y-%m-%d') }}</dd>
+      <dt>Priority</dt><dd>{{ record.priority }}</dd>
+      <dt>Reminder count</dt><dd>{{ record.reminder_count }}</dd>
+    </dl>
+  </div>
+
+  <div class="panel">
+    <h2>Current information</h2>
+    <p class="prompt">{{ record.requested_change }}</p>
+    <pre>{{ record.current_value }}</pre>
+  </div>
+</section>
+
+<section class="form-band">
+  <form method="post" class="response-form">
+    <h2>Associate response</h2>
+    <label>
+      Completed value
+      <textarea name="submitted_value" rows="5" required>{{ record.submitted_value }}</textarea>
+    </label>
+    <label>
+      Notes
+      <textarea name="notes" rows="4">{{ record.notes }}</textarea>
+    </label>
+    <label>
+      Submitted by
+      <input name="actor" value="{{ record.assigned_to }}">
+    </label>
+    <button type="submit">Submit response</button>
+  </form>
+
+  <form method="post" action="{{ url_for('pulse.update_status', request_id=record.request_id) }}" class="status-form">
+    <h2>Manager controls</h2>
+    <label>
+      Status
+      <select name="status">
+        {% for option in ["In Progress", "Submitted", "Completed", "Escalated"] %}
+          <option value="{{ option }}" {{ "selected" if record.status == option else "" }}>{{ option }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Updated by
+      <input name="actor" value="manager">
+    </label>
+    <button type="submit">Update status</button>
+  </form>
+</section>
+{% endblock %}

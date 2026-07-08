@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Reminders{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <p class="eyebrow">Manual send queue</p>
+    <h1>Reminders</h1>
+  </div>
+  <form method="post">
+    <input type="hidden" name="request_id" value="all">
+    <button type="submit">Send all due</button>
+  </form>
+</section>
+
+<p class="muted">Showing pending requests due within {{ days_ahead }} days. In development mode, messages are logged to Excel instead of sent.</p>
+
+<section class="reminder-list">
+  {% for record, message in messages %}
+    <article class="reminder-row">
+      <div>
+        <h2>{{ record.request_id }} / {{ record.title }}</h2>
+        <p>{{ record.assigned_to }} / {{ message.recipient }} / Due {{ record.due_date.strftime('%Y-%m-%d') }}</p>
+        <pre>{{ message.body }}</pre>
+      </div>
+      <form method="post">
+        <input type="hidden" name="request_id" value="{{ record.request_id }}">
+        <button type="submit">{{ "Escalate" if message.escalate else "Send" }}</button>
+      </form>
+    </article>
+  {% else %}
+    <div class="empty">No reminder messages are ready.</div>
+  {% endfor %}
+</section>
+{% endblock %}

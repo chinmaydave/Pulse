@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <p class="eyebrow">Audit trail</p>
+    <h1>Reports</h1>
+  </div>
+</section>
+
+<section class="split">
+  <div>
+    <h2>Reminder log</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>ID</th>
+          <th>Recipient</th>
+          <th>Channel</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in reminder_rows %}
+          <tr>
+            <td>{{ row.timestamp }}</td>
+            <td>{{ row.request_id }}</td>
+            <td>{{ row.recipient }}</td>
+            <td>{{ row.channel }}</td>
+            <td>{{ row.status }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" class="empty">No reminders recorded.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div>
+    <h2>Audit log</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>ID</th>
+          <th>Actor</th>
+          <th>Action</th>
+          <th>Details</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in audit_rows %}
+          <tr>
+            <td>{{ row.timestamp }}</td>
+            <td>{{ row.request_id }}</td>
+            <td>{{ row.actor }}</td>
+            <td>{{ row.action }}</td>
+            <td>{{ row.details }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" class="empty">No audit rows recorded.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

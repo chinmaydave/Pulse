@@ -7,7 +7,7 @@ Chinmay Dave - Python Development
 
 Liam Ben-Zvi - Integration to Outlook and Teams App
 
-Kavit Timbadia - Testing, Documentation
+Kavit Timbadia - UI, Testing, Documentation
 
 ---
 

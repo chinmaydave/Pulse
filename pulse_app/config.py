@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 import os
 
@@ -6,19 +6,68 @@ import os
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def _env_bool(name: str, default: bool = False) -> bool:
+    return os.getenv(name, str(default)).lower() in {"1", "true", "yes", "on"}
+
+
+@dataclass(frozen=True)
+class SmtpSettings:
+    host: str = "localhost"
+    port: int = 1025
+    username: str = ""
+    password: str = ""
+    use_tls: bool = False
+    use_ssl: bool = False
+    from_address: str = "pulse@localhost"
+    timeout: int = 10
+
+    @classmethod
+    def from_env(cls) -> "SmtpSettings":
+        return cls(
+            host=os.getenv("PULSE_SMTP_HOST", "localhost"),
+            port=int(os.getenv("PULSE_SMTP_PORT", "1025")),
+            username=os.getenv("PULSE_SMTP_USER", ""),
+            password=os.getenv("PULSE_SMTP_PASSWORD", ""),
+            use_tls=_env_bool("PULSE_SMTP_USE_TLS", False),
+            use_ssl=_env_bool("PULSE_SMTP_USE_SSL", False),
+            from_address=os.getenv("PULSE_SMTP_FROM", "pulse@localhost"),
+            timeout=int(os.getenv("PULSE_SMTP_TIMEOUT", "10")),
+        )
+
+
+def _resolve_backend() -> str:
+    """dev (default) | smtp | outlook.
+
+    PULSE_EMAIL_BACKEND wins if set. Otherwise PULSE_USE_OUTLOOK=true is honored
+    for backward compatibility with the original Outlook-only flag.
+    """
+    backend = os.getenv("PULSE_EMAIL_BACKEND", "").strip().lower()
+    if backend:
+        return backend
+    if _env_bool("PULSE_USE_OUTLOOK", False):
+        return "outlook"
+    return "dev"
+
+
 @dataclass(frozen=True)
 class AppConfig:
     workbook_path: Path
     upload_dir: Path = BASE_DIR / "data" / "uploads"
     app_base_url: str = "http://127.0.0.1:5000"
-    use_outlook: bool = False
     auto_reminders_enabled: bool = False
+    email_backend: str = "dev"
+    smtp: SmtpSettings = field(default_factory=SmtpSettings)
     reminder_days_ahead: int = 3
     reminder_scan_interval_seconds: int = 300
     reminder_cooldown_hours: int = 24
     host: str = "0.0.0.0"
     port: int = 5000
     debug: bool = False
+
+    @property
+    def use_outlook(self) -> bool:
+        # Preserved so existing callers/templates that read use_outlook still work.
+        return self.email_backend == "outlook"
 
     @classmethod
     def from_env(cls) -> "AppConfig":
@@ -29,8 +78,9 @@ class AppConfig:
             workbook_path=workbook_path,
             upload_dir=Path(os.getenv("PULSE_UPLOAD_DIR", BASE_DIR / "data" / "uploads")),
             app_base_url=os.getenv("PULSE_APP_BASE_URL", "http://127.0.0.1:5000"),
-            use_outlook=os.getenv("PULSE_USE_OUTLOOK", "false").lower() == "true",
             auto_reminders_enabled=os.getenv("PULSE_AUTO_REMINDERS", "false").lower() == "true",
+            email_backend=_resolve_backend(),
+            smtp=SmtpSettings.from_env(),
             reminder_days_ahead=int(os.getenv("PULSE_REMINDER_DAYS_AHEAD", "3")),
             reminder_scan_interval_seconds=int(os.getenv("PULSE_REMINDER_SCAN_INTERVAL_SECONDS", "300")),
             reminder_cooldown_hours=int(os.getenv("PULSE_REMINDER_COOLDOWN_HOURS", "24")),

@@ -80,6 +80,7 @@ class ReminderAgent:
 class AgentSnapshot:
     enabled: bool
     running: bool
+    email_backend: str
     use_outlook: bool
     days_ahead: int
     scan_interval_seconds: int
@@ -96,6 +97,7 @@ class AutomaticReminderAgent:
     repository: ExcelRepository
     mailer: EmailService
     app_base_url: str
+    email_backend: str
     use_outlook: bool
     days_ahead: int
     scan_interval_seconds: int
@@ -154,6 +156,7 @@ class AutomaticReminderAgent:
             return AgentSnapshot(
                 enabled=self.enabled,
                 running=bool(self._thread and self._thread.is_alive()),
+                email_backend=self.email_backend,
                 use_outlook=self.use_outlook,
                 days_ahead=self.days_ahead,
                 scan_interval_seconds=self.scan_interval_seconds,

@@ -47,7 +47,7 @@ Pulse can run a background reminder agent inside the Flask process. The agent sc
 Automatic sending is opt-in so local test runs do not accidentally send real mail:
 
 ```bash
-PULSE_USE_OUTLOOK=true \
+PULSE_EMAIL_BACKEND=outlook \
 PULSE_AUTO_REMINDERS=true \
 PULSE_APP_BASE_URL=http://SERVER_INTERNAL_IP:5000 \
 python -m pulse_app
@@ -56,7 +56,7 @@ python -m pulse_app
 PowerShell:
 
 ```powershell
-$env:PULSE_USE_OUTLOOK="true"
+$env:PULSE_EMAIL_BACKEND="outlook"
 $env:PULSE_AUTO_REMINDERS="true"
 $env:PULSE_APP_BASE_URL="http://SERVER_INTERNAL_IP:5000"
 python -m pulse_app
@@ -75,6 +75,25 @@ PULSE_DEBUG=false
 
 Keep the active workbook closed in Excel while the agent is running. Excel creates a `~$...xlsx` lock file when the workbook is open, and that prevents Pulse from saving reminder counts and logs.
 
+## SMTP Sending
+
+For cross-platform sending, set `PULSE_EMAIL_BACKEND=smtp` and provide SMTP settings:
+
+```powershell
+$env:PULSE_EMAIL_BACKEND="smtp"
+$env:PULSE_SMTP_HOST="smtp.example.com"
+$env:PULSE_SMTP_PORT="587"
+$env:PULSE_SMTP_USER="pulse@example.com"
+$env:PULSE_SMTP_PASSWORD="app-password"
+$env:PULSE_SMTP_USE_TLS="true"
+$env:PULSE_SMTP_FROM="pulse@example.com"
+$env:PULSE_AUTO_REMINDERS="true"
+$env:PULSE_APP_BASE_URL="http://SERVER_INTERNAL_IP:5000"
+python -m pulse_app
+```
+
+Use `PULSE_EMAIL_BACKEND=dev` for UI testing without sending real email.
+
 You can also upload a workbook from the web UI:
 
 ```text
@@ -85,7 +104,7 @@ Uploaded workbooks must be `.xlsx` files with a `Requests` sheet and the require
 
 ## Outlook Sending
 
-By default reminders are logged to Excel instead of sent. On a Windows internal machine with Outlook installed, set:
+By default reminders are logged to Excel instead of sent. On a Windows internal machine with Outlook installed, set either `PULSE_EMAIL_BACKEND=outlook` or the older compatibility flag:
 
 ```bash
 PULSE_USE_OUTLOOK=true python -m pulse_app

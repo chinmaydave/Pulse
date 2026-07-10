@@ -34,8 +34,9 @@ def _build_automatic_agent(app):
     cfg = app.config["PULSE_CONFIG"]
     return AutomaticReminderAgent(
         repository=app.pulse_repository,
-        mailer=email_service(cfg.use_outlook),
+        mailer=email_service(cfg),
         app_base_url=cfg.app_base_url,
+        email_backend=cfg.email_backend,
         use_outlook=cfg.use_outlook,
         days_ahead=cfg.reminder_days_ahead,
         scan_interval_seconds=cfg.reminder_scan_interval_seconds,

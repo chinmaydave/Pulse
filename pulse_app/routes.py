@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
+from shutil import copyfileobj
+
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
+from werkzeug.utils import secure_filename
 
 from .agents import ReminderAgent
 from .email_service import email_service
+from .excel_repository import ExcelRepository, REQUEST_HEADERS
 
 
 bp = Blueprint("pulse", __name__)
@@ -17,6 +22,10 @@ def config():
     return current_app.config["PULSE_CONFIG"]
 
 
+def set_repository(workbook_path: Path) -> None:
+    current_app.pulse_repository = ExcelRepository(workbook_path)
+
+
 @bp.route("/")
 def dashboard():
     records = repository().list_requests()
@@ -25,7 +34,43 @@ def dashboard():
         summary=repository().summary(),
         records=records,
         pending=repository().pending_for_reminder(config().reminder_days_ahead),
-        workbook_path=config().workbook_path,
+        workbook_path=repository().workbook_path,
+    )
+
+
+@bp.route("/data-source", methods=["GET", "POST"])
+def data_source():
+    cfg = config()
+    if request.method == "POST":
+        upload = request.files.get("workbook")
+        if not upload or not upload.filename:
+            flash("Choose an Excel workbook to upload.", "error")
+            return redirect(url_for("pulse.data_source"))
+        if not upload.filename.lower().endswith(".xlsx"):
+            flash("Upload a .xlsx workbook.", "error")
+            return redirect(url_for("pulse.data_source"))
+
+        cfg.upload_dir.mkdir(parents=True, exist_ok=True)
+        filename = secure_filename(upload.filename)
+        uploaded_path = cfg.upload_dir / filename
+        with uploaded_path.open("wb") as target:
+            copyfileobj(upload.stream, target)
+
+        try:
+            ExcelRepository.validate_workbook(uploaded_path)
+            set_repository(uploaded_path)
+        except Exception as exc:
+            uploaded_path.unlink(missing_ok=True)
+            flash(str(exc), "error")
+            return redirect(url_for("pulse.data_source"))
+
+        flash(f"Workbook uploaded and activated: {filename}", "success")
+        return redirect(url_for("pulse.dashboard"))
+
+    return render_template(
+        "data_source.html",
+        workbook_path=repository().workbook_path,
+        required_headers=", ".join(REQUEST_HEADERS),
     )
 
 

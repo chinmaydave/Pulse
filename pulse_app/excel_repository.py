@@ -57,6 +57,33 @@ class ExcelRepository:
         self._lock = Lock()
         if not self.workbook_path.exists():
             self.create_mock_workbook()
+        self.ensure_workbook_ready()
+
+    @staticmethod
+    def validate_workbook(workbook_path: Path) -> None:
+        workbook = load_workbook(workbook_path)
+        if "Requests" not in workbook.sheetnames:
+            raise ValueError("Workbook must contain a Requests sheet.")
+
+        headers = [cell.value for cell in workbook["Requests"][1]]
+        missing = [header for header in REQUEST_HEADERS if header not in headers]
+        if missing:
+            raise ValueError(f"Requests sheet is missing columns: {', '.join(missing)}")
+
+    def ensure_workbook_ready(self) -> None:
+        self.validate_workbook(self.workbook_path)
+        workbook = load_workbook(self.workbook_path)
+        changed = False
+        if "AuditLog" not in workbook.sheetnames:
+            audit = workbook.create_sheet("AuditLog")
+            audit.append(AUDIT_HEADERS)
+            audit.append([datetime.now(), "SYSTEM", "upload", "created", "Audit sheet initialized."])
+            changed = True
+        if "ReminderLog" not in workbook.sheetnames:
+            workbook.create_sheet("ReminderLog").append(REMINDER_HEADERS)
+            changed = True
+        if changed:
+            workbook.save(self.workbook_path)
 
     def create_mock_workbook(self) -> None:
         self.workbook_path.parent.mkdir(parents=True, exist_ok=True)

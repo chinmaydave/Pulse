@@ -118,6 +118,36 @@ a:hover {
   margin-bottom: 28px;
 }
 
+.agent-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 28px;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.agent-strip > div {
+  display: grid;
+  gap: 4px;
+}
+
+.agent-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.button-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .metric,
 .panel,
 .response-form,
@@ -353,6 +383,7 @@ pre {
 
 @media (max-width: 900px) {
   .metrics,
+  .agent-strip,
   .split,
   .detail-grid,
   .form-band,

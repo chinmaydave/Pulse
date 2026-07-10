@@ -1,0 +1,32 @@
+WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://10.0.0.176:5000
+Press CTRL+C to quit
+127.0.0.1 - - [10/Jul/2026 13:04:22] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [10/Jul/2026 13:04:22] "GET /static/styles.css HTTP/1.1" 200 -
+127.0.0.1 - - [10/Jul/2026 13:04:22] "GET /static/styles.css HTTP/1.1" 304 -
+127.0.0.1 - - [10/Jul/2026 13:04:27] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [10/Jul/2026 13:04:27] "GET /static/styles.css HTTP/1.1" 304 -
+127.0.0.1 - - [10/Jul/2026 13:06:36] "GET /requests HTTP/1.1" 200 -
+127.0.0.1 - - [10/Jul/2026 13:06:36] "GET /static/styles.css HTTP/1.1" 304 -
+127.0.0.1 - - [10/Jul/2026 13:06:39] "GET /reminders HTTP/1.1" 200 -
+127.0.0.1 - - [10/Jul/2026 13:06:39] "GET /static/styles.css HTTP/1.1" 304 -
+127.0.0.1 - - [10/Jul/2026 13:06:44] "GET /reports HTTP/1.1" 200 -
+127.0.0.1 - - [10/Jul/2026 13:06:44] "GET /static/styles.css HTTP/1.1" 304 -
+127.0.0.1 - - [10/Jul/2026 13:06:45] "GET /reminders HTTP/1.1" 200 -
+127.0.0.1 - - [10/Jul/2026 13:06:45] "GET /static/styles.css HTTP/1.1" 304 -
+127.0.0.1 - - [10/Jul/2026 13:07:21] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [10/Jul/2026 13:07:21] "GET /static/styles.css HTTP/1.1" 304 -
+127.0.0.1 - - [10/Jul/2026 13:08:02] "GET /reminders HTTP/1.1" 200 -
+127.0.0.1 - - [10/Jul/2026 13:08:02] "GET /static/styles.css HTTP/1.1" 304 -
+127.0.0.1 - - [10/Jul/2026 13:08:05] "POST /reminders HTTP/1.1" 302 -
+127.0.0.1 - - [10/Jul/2026 13:08:05] "GET /reminders HTTP/1.1" 200 -
+127.0.0.1 - - [10/Jul/2026 13:08:05] "GET /static/styles.css HTTP/1.1" 304 -
+127.0.0.1 - - [10/Jul/2026 13:08:12] "GET /reports HTTP/1.1" 200 -
+127.0.0.1 - - [10/Jul/2026 13:08:12] "GET /static/styles.css HTTP/1.1" 304 -
+127.0.0.1 - - [10/Jul/2026 13:08:24] "GET /reminders HTTP/1.1" 200 -
+127.0.0.1 - - [10/Jul/2026 13:08:24] "GET /static/styles.css HTTP/1.1" 304 -
+127.0.0.1 - - [10/Jul/2026 13:08:24] "GET /static/styles.css HTTP/1.1" 304 -
+127.0.0.1 - - [10/Jul/2026 13:09:05] "GET /reports HTTP/1.1" 200 -
+127.0.0.1 - - [10/Jul/2026 13:09:05] "GET /static/styles.css HTTP/1.1" 304 -

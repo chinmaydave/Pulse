@@ -18,6 +18,25 @@
   <div class="metric warning"><span>Escalated</span><strong>{{ summary.escalated }}</strong></div>
 </section>
 
+<section class="agent-strip">
+  <div>
+    <span class="agent-label">Automation</span>
+    <strong>{{ "Running" if agent_snapshot.running else ("Enabled" if agent_snapshot.enabled else "Disabled") }}</strong>
+  </div>
+  <div>
+    <span class="agent-label">Email channel</span>
+    <strong>{{ "Outlook" if agent_snapshot.use_outlook else "Development log" }}</strong>
+  </div>
+  <div>
+    <span class="agent-label">Scan cadence</span>
+    <strong>{{ agent_snapshot.scan_interval_seconds }}s / {{ agent_snapshot.cooldown_hours }}h cooldown</strong>
+  </div>
+  <div>
+    <span class="agent-label">Last scan</span>
+    <strong>{{ agent_snapshot.last_scan_at or "Not yet" }}</strong>
+  </div>
+</section>
+
 <section class="split">
   <div>
     <div class="section-title">

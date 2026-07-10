@@ -24,6 +24,12 @@ def config():
 
 def set_repository(workbook_path: Path) -> None:
     current_app.pulse_repository = ExcelRepository(workbook_path)
+    if hasattr(current_app, "pulse_automatic_agent"):
+        current_app.pulse_automatic_agent.repository = current_app.pulse_repository
+
+
+def automatic_agent():
+    return current_app.pulse_automatic_agent
 
 
 @bp.route("/")
@@ -35,6 +41,7 @@ def dashboard():
         records=records,
         pending=repository().pending_for_reminder(config().reminder_days_ahead),
         workbook_path=repository().workbook_path,
+        agent_snapshot=automatic_agent().snapshot(),
     )
 
 
@@ -124,7 +131,10 @@ def reminders():
 
     if request.method == "POST":
         request_id = request.form.get("request_id", "")
-        if request_id == "all":
+        if request_id == "automatic-once":
+            results = automatic_agent().run_once()
+            flash(f"Automatic agent processed {len(results)} reminder(s).", "success")
+        elif request_id == "all":
             results = agent.send_pending(cfg.reminder_days_ahead)
             flash(f"Processed {len(results)} pending reminders.", "success")
         else:
@@ -137,8 +147,16 @@ def reminders():
         return redirect(url_for("pulse.reminders"))
 
     pending = repository().pending_for_reminder(cfg.reminder_days_ahead)
+    automatic_due = agent.due_for_automatic_send(cfg.reminder_days_ahead, cfg.reminder_cooldown_hours)
     messages = [(record, agent.build_message(record)) for record in pending]
-    return render_template("reminders.html", messages=messages, days_ahead=cfg.reminder_days_ahead)
+    return render_template(
+        "reminders.html",
+        messages=messages,
+        automatic_due=automatic_due,
+        days_ahead=cfg.reminder_days_ahead,
+        cooldown_hours=cfg.reminder_cooldown_hours,
+        agent_snapshot=automatic_agent().snapshot(),
+    )
 
 
 @bp.route("/reports")

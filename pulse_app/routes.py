@@ -119,7 +119,7 @@ def update_status(request_id: str):
 @bp.route("/reminders", methods=["GET", "POST"])
 def reminders():
     cfg = config()
-    mailer = email_service(cfg.use_outlook)
+    mailer = email_service(cfg)
     agent = ReminderAgent(repository(), mailer, request.host_url.rstrip("/"))
 
     if request.method == "POST":

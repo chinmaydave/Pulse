@@ -9,6 +9,8 @@ from openpyxl import Workbook, load_workbook
 
 from .models import (
     ACTIVE_STATUSES,
+    EmployeeRecord,
+    ExpirationTarget,
     RequestRecord,
     STATUS_COMPLETED,
     STATUS_ESCALATED,
@@ -39,15 +41,42 @@ REQUEST_HEADERS = [
     "escalated_at",
 ]
 
-AUDIT_HEADERS = ["timestamp", "request_id", "actor", "action", "details"]
+EMPLOYEE_HEADERS = [
+    "Employee ID",
+    "Name",
+    "Email",
+    "Citizenship Status",
+    "Passport Valid Until",
+    "Driver License Valid Until",
+    "Visa Valid Until",
+]
+
+AUDIT_HEADERS = ["timestamp", "record_id", "actor", "action", "details"]
 REMINDER_HEADERS = [
     "timestamp",
-    "request_id",
+    "target_key",
+    "employee_id",
+    "employee_name",
     "recipient",
+    "field_name",
+    "expiration_date",
     "subject",
     "channel",
     "status",
     "message_preview",
+]
+REMINDER_REQUESTS_HEADERS = [
+    "timestamp",
+    "target_key",
+    "employee_id",
+    "employee_name",
+    "field_name",
+    "expiration_date",
+    "days_until_due",
+    "status",
+    "recipient",
+    "subject",
+    "channel",
 ]
 
 
@@ -62,13 +91,13 @@ class ExcelRepository:
     @staticmethod
     def validate_workbook(workbook_path: Path) -> None:
         workbook = load_workbook(workbook_path)
-        if "Requests" not in workbook.sheetnames:
-            raise ValueError("Workbook must contain a Requests sheet.")
+        if "Employees" not in workbook.sheetnames:
+            raise ValueError("Workbook must contain an Employees sheet.")
 
-        headers = [cell.value for cell in workbook["Requests"][1]]
-        missing = [header for header in REQUEST_HEADERS if header not in headers]
+        headers = [cell.value for cell in workbook["Employees"][1]]
+        missing = [header for header in EMPLOYEE_HEADERS if header not in headers]
         if missing:
-            raise ValueError(f"Requests sheet is missing columns: {', '.join(missing)}")
+            raise ValueError(f"Employees sheet is missing columns: {', '.join(missing)}")
 
     def ensure_workbook_ready(self) -> None:
         self.validate_workbook(self.workbook_path)
@@ -82,133 +111,128 @@ class ExcelRepository:
         if "ReminderLog" not in workbook.sheetnames:
             workbook.create_sheet("ReminderLog").append(REMINDER_HEADERS)
             changed = True
+        if "ReminderRequests" not in workbook.sheetnames:
+            workbook.create_sheet("ReminderRequests").append(REMINDER_REQUESTS_HEADERS)
+            changed = True
         if changed:
             workbook.save(self.workbook_path)
 
     def create_mock_workbook(self) -> None:
         self.workbook_path.parent.mkdir(parents=True, exist_ok=True)
         workbook = Workbook()
-        requests = workbook.active
-        requests.title = "Requests"
-        requests.append(REQUEST_HEADERS)
+        employees = workbook.active
+        employees.title = "Employees"
+        employees.append(EMPLOYEE_HEADERS)
 
         today = date.today()
         rows = [
             [
-                "REQ-1001",
-                "Update emergency contact",
-                "Employee Data",
+                "E-1001",
                 "Avery Johnson",
                 "avery.johnson@example.com",
-                "manager.hr@example.com",
-                today,
-                "Open",
-                "High",
-                "HRIS",
-                "Confirm and update emergency contact details.",
-                "Primary contact: Morgan Johnson, 555-0101",
-                "",
-                "",
-                datetime.now(),
-                None,
-                None,
-                0,
-                None,
+                "Citizen",
+                today + timedelta(days=30),
+                today + timedelta(days=90),
+                today + timedelta(days=120),
             ],
             [
-                "REQ-1002",
-                "Validate cost center",
-                "Finance",
+                "E-1002",
                 "Blake Smith",
                 "blake.smith@example.com",
-                "manager.finance@example.com",
-                today + timedelta(days=2),
-                "In Progress",
-                "Medium",
-                "ERP",
-                "Validate the employee cost center and submit corrections.",
-                "CC-4820 Operations",
-                "",
-                "Associate opened request.",
-                datetime.now(),
-                None,
-                None,
-                1,
-                None,
+                "Permanent Resident",
+                today - timedelta(days=1),
+                today + timedelta(days=60),
+                today + timedelta(days=10),
             ],
             [
-                "REQ-1003",
-                "Submit license renewal details",
-                "Compliance",
+                "E-1003",
                 "Casey Lee",
                 "casey.lee@example.com",
-                "manager.compliance@example.com",
-                today - timedelta(days=1),
-                "Open",
-                "Critical",
-                "Compliance Tracker",
-                "Provide renewed license number and expiration date.",
-                "License expires this month.",
-                "",
-                "",
-                datetime.now(),
-                None,
-                None,
-                2,
-                None,
-            ],
-            [
-                "REQ-1004",
-                "Confirm team directory data",
-                "Operations",
-                "Devon Patel",
-                "devon.patel@example.com",
-                "manager.ops@example.com",
-                today + timedelta(days=5),
-                "Submitted",
-                "Low",
-                "Directory",
-                "Confirm title, location, and desk phone.",
-                "Analyst, Chicago, 555-0144",
-                "Analyst, Chicago, 555-0188",
-                "Desk phone changed.",
-                datetime.now(),
-                datetime.now(),
-                None,
-                0,
-                None,
+                "Work Visa",
+                today + timedelta(days=365),
+                today + timedelta(days=180),
+                today - timedelta(days=5),
             ],
         ]
 
         for row in rows:
-            requests.append(row)
+            employees.append(row)
 
         audit = workbook.create_sheet("AuditLog")
         audit.append(AUDIT_HEADERS)
         audit.append([datetime.now(), "SYSTEM", "seed", "created", "Mock workbook initialized."])
 
-        reminders = workbook.create_sheet("ReminderLog")
-        reminders.append(REMINDER_HEADERS)
+        workbook.create_sheet("ReminderLog").append(REMINDER_HEADERS)
+        workbook.create_sheet("ReminderRequests").append(REMINDER_REQUESTS_HEADERS)
 
         workbook.save(self.workbook_path)
+
+    def list_employees(self) -> list[EmployeeRecord]:
+        with self._lock:
+            workbook = load_workbook(self.workbook_path)
+            sheet = workbook["Employees"]
+            return [self._row_to_employee(row) for row in self._iter_rows(sheet)]
 
     def list_requests(self) -> list[RequestRecord]:
         with self._lock:
             workbook = load_workbook(self.workbook_path)
+            if "Requests" not in workbook.sheetnames:
+                return []
             sheet = workbook["Requests"]
             return [self._row_to_record(row) for row in self._iter_rows(sheet)]
 
     def get_request(self, request_id: str) -> RequestRecord | None:
         return next((record for record in self.list_requests() if record.request_id == request_id), None)
 
-    def pending_for_reminder(self, days_ahead: int) -> list[RequestRecord]:
+    def pending_for_reminder(self, days_ahead: int, expiration_filter: str | None = None) -> list[ExpirationTarget]:
         today = date.today()
-        horizon = today.toordinal() + days_ahead
+        if expiration_filter == "overdue":
+            def include_target(target: ExpirationTarget) -> bool:
+                return target.expiration_date < today
+        elif expiration_filter == "7":
+            def include_target(target: ExpirationTarget) -> bool:
+                return 0 <= target.days_until_due <= 7
+        elif expiration_filter == "14":
+            def include_target(target: ExpirationTarget) -> bool:
+                return 0 <= target.days_until_due <= 14
+        elif expiration_filter == "30":
+            def include_target(target: ExpirationTarget) -> bool:
+                return 0 <= target.days_until_due <= 30
+        else:
+            horizon = today + timedelta(days=days_ahead)
+            def include_target(target: ExpirationTarget) -> bool:
+                return target.expiration_date <= horizon
+
         return [
-            record
-            for record in self.list_requests()
-            if record.status in ACTIVE_STATUSES and record.due_date.toordinal() <= horizon
+            target
+            for employee in self.list_employees()
+            for target in employee.expiration_targets()
+            if include_target(target)
         ]
+
+    def find_target_by_key(self, target_key: str) -> ExpirationTarget | None:
+        for employee in self.list_employees():
+            for target in employee.expiration_targets():
+                if target.target_key == target_key:
+                    return target
+        return None
+
+    def last_reminder_for_target(self, target_key: str) -> datetime | None:
+        with self._lock:
+            workbook = load_workbook(self.workbook_path)
+            if "ReminderLog" not in workbook.sheetnames:
+                return None
+            sheet = workbook["ReminderLog"]
+            headers = [cell.value for cell in sheet[1]]
+            rows = self._iter_rows(sheet)
+            timestamps = [
+                row["timestamp"]
+                for row in rows
+                if row.get("target_key") == target_key and row.get("timestamp") is not None
+            ]
+            if not timestamps:
+                return None
+            return max(timestamps)
 
     def submit_response(self, request_id: str, submitted_value: str, notes: str, actor: str) -> None:
         with self._lock:
@@ -244,37 +268,61 @@ class ExcelRepository:
 
     def record_reminder(
         self,
-        request_id: str,
+        target: ExpirationTarget,
         recipient: str,
         subject: str,
         message_preview: str,
         channel: str,
         status: str,
-        escalate: bool,
     ) -> None:
         with self._lock:
             workbook = load_workbook(self.workbook_path)
-            sheet = workbook["Requests"]
-            row_idx = self._find_row(sheet, request_id)
-            if row_idx is None:
-                raise KeyError(f"Request {request_id} not found")
-
-            now = datetime.now()
-            current_count = self._get(sheet, row_idx, "reminder_count") or 0
-            self._set(sheet, row_idx, "last_reminder_at", now)
-            self._set(sheet, row_idx, "reminder_count", int(current_count) + 1)
-            if escalate:
-                self._set(sheet, row_idx, "status", STATUS_ESCALATED)
-                self._set(sheet, row_idx, "escalated_at", now)
-
             reminders = workbook["ReminderLog"]
-            reminders.append([now, request_id, recipient, subject, channel, status, message_preview[:180]])
+            reminders.append([
+                datetime.now(),
+                target.target_key,
+                target.employee_id,
+                target.employee_name,
+                recipient,
+                target.field_name,
+                target.expiration_date,
+                subject,
+                channel,
+                status,
+                message_preview[:180],
+            ])
             self._append_audit(
                 workbook,
-                request_id,
+                target.employee_id,
                 "system",
                 "reminder_sent",
-                f"{channel} reminder recorded for {recipient}.",
+                f"{channel} reminder recorded for {recipient} ({target.field_name}).",
+            )
+            workbook.save(self.workbook_path)
+
+    def record_reminder_request(self, target: ExpirationTarget, recipient: str, subject: str, channel: str) -> None:
+        with self._lock:
+            workbook = load_workbook(self.workbook_path)
+            requests = workbook["ReminderRequests"]
+            requests.append([
+                datetime.now(),
+                target.target_key,
+                target.employee_id,
+                target.employee_name,
+                target.field_name,
+                target.expiration_date,
+                target.days_until_due,
+                target.status,
+                recipient,
+                subject,
+                channel,
+            ])
+            self._append_audit(
+                workbook,
+                target.employee_id,
+                "system",
+                "reminder_requested",
+                f"Reminder request recorded for {target.field_name}.",
             )
             workbook.save(self.workbook_path)
 
@@ -285,15 +333,17 @@ class ExcelRepository:
         return self._sheet_rows("ReminderLog")
 
     def summary(self) -> dict[str, int]:
-        records = self.list_requests()
+        records = self.list_employees()
+        expiration_targets = [
+            target
+            for employee in records
+            for target in employee.expiration_targets()
+        ]
         return {
             "total": len(records),
-            "open": sum(1 for record in records if record.status == "Open"),
-            "in_progress": sum(1 for record in records if record.status == STATUS_IN_PROGRESS),
-            "submitted": sum(1 for record in records if record.status == STATUS_SUBMITTED),
-            "completed": sum(1 for record in records if record.status == STATUS_COMPLETED),
-            "escalated": sum(1 for record in records if record.status == STATUS_ESCALATED),
-            "overdue": sum(1 for record in records if record.is_overdue),
+            "overdue": sum(1 for target in expiration_targets if target.is_overdue),
+            "due_soon": sum(1 for target in expiration_targets if not target.is_overdue and target.days_until_due <= 3),
+            "upcoming": sum(1 for target in expiration_targets if target.days_until_due > 3),
         }
 
     def _sheet_rows(self, sheet_name: str) -> list[dict[str, Any]]:
@@ -314,6 +364,22 @@ class ExcelRepository:
             for raw_row in sheet.iter_rows(min_row=2, values_only=True)
             if any(value is not None for value in raw_row)
         ]
+
+    def _row_to_employee(self, row: dict[str, Any]) -> EmployeeRecord:
+        def normalize_date(value: Any) -> date | None:
+            if isinstance(value, datetime):
+                return value.date()
+            return value
+
+        return EmployeeRecord(
+            employee_id=row["Employee ID"],
+            name=row["Name"],
+            email=row["Email"],
+            citizenship_status=row["Citizenship Status"],
+            passport_valid_until=normalize_date(row["Passport Valid Until"]),
+            driver_license_valid_until=normalize_date(row["Driver License Valid Until"]),
+            visa_valid_until=normalize_date(row["Visa Valid Until"]),
+        )
 
     def _row_to_record(self, row: dict[str, Any]) -> RequestRecord:
         due_date = row["due_date"]

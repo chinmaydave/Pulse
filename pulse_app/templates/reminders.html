@@ -9,10 +9,12 @@
   <div class="button-row">
     <form method="post">
       <input type="hidden" name="request_id" value="automatic-once">
+      <input type="hidden" name="expiration_filter" value="{{ expiration_filter }}">
       <button type="submit">Run agent now</button>
     </form>
     <form method="post">
       <input type="hidden" name="request_id" value="all">
+      <input type="hidden" name="expiration_filter" value="{{ expiration_filter }}">
       <button type="submit">Send all due</button>
     </form>
   </div>
@@ -37,18 +39,32 @@
   </div>
 </section>
 
-<p class="muted">Showing pending requests due within {{ days_ahead }} days. The automatic agent only sends records outside the {{ cooldown_hours }} hour reminder cooldown.</p>
+<section class="filter-strip">
+  <form method="get">
+    <label for="expiration_filter">Expiration filter:</label>
+    <select id="expiration_filter" name="expiration_filter" onchange="this.form.submit()">
+      <option value="all" {% if expiration_filter == "all" %}selected{% endif %}>All expiring records</option>
+      <option value="overdue" {% if expiration_filter == "overdue" %}selected{% endif %}>Overdue</option>
+      <option value="30" {% if expiration_filter == "30" %}selected{% endif %}>Expires in 30 days or less</option>
+      <option value="14" {% if expiration_filter == "14" %}selected{% endif %}>Expires in 14 days or less</option>
+      <option value="7" {% if expiration_filter == "7" %}selected{% endif %}>Expires in 7 days or less</option>
+    </select>
+  </form>
+  <p class="muted">Showing {{ filter_label }}.</p>
+</section>
+
+<p class="muted">The automatic agent only sends records outside the {{ cooldown_hours }} hour reminder cooldown.</p>
 
 <section class="reminder-list">
-  {% for record, message in messages %}
+  {% for target, message in messages %}
     <article class="reminder-row">
       <div>
-        <h2>{{ record.request_id }} / {{ record.title }}</h2>
-        <p>{{ record.assigned_to }} / {{ message.recipient }} / Due {{ record.due_date.strftime('%Y-%m-%d') }}</p>
+        <h2>{{ target.employee_name }} / {{ target.field_name }}</h2>
+        <p>{{ target.employee_id }} / {{ message.recipient }} / Expires {{ target.expiration_date.strftime('%Y-%m-%d') }}</p>
         <pre>{{ message.body }}</pre>
       </div>
       <form method="post">
-        <input type="hidden" name="request_id" value="{{ record.request_id }}">
+        <input type="hidden" name="target_key" value="{{ target.target_key }}">
         <button type="submit">{{ "Escalate" if message.escalate else "Send" }}</button>
       </form>
     </article>

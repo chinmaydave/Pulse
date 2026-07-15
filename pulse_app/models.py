@@ -49,8 +49,66 @@ class RequestRecord:
 
 
 @dataclass(frozen=True)
+class EmployeeRecord:
+    employee_id: str
+    name: str
+    email: str
+    citizenship_status: str
+    passport_valid_until: date | None
+    driver_license_valid_until: date | None
+    visa_valid_until: date | None
+
+    def expiration_fields(self) -> list[tuple[str, date | None]]:
+        return [
+            ("Passport Valid Until", self.passport_valid_until),
+            ("Driver License Valid Until", self.driver_license_valid_until),
+            ("Visa Valid Until", self.visa_valid_until),
+        ]
+
+    def expiration_targets(self) -> list["ExpirationTarget"]:
+        today = date.today()
+        targets: list[ExpirationTarget] = []
+        for field_name, expiration_date in self.expiration_fields():
+            if expiration_date is None:
+                continue
+            days_until_due = (expiration_date - today).days
+            status = "overdue" if expiration_date < today else "due_soon" if days_until_due <= 0 else "upcoming"
+            targets.append(
+                ExpirationTarget(
+                    employee_id=self.employee_id,
+                    employee_name=self.name,
+                    email=self.email,
+                    field_name=field_name,
+                    expiration_date=expiration_date,
+                    days_until_due=days_until_due,
+                    status=status,
+                )
+            )
+        return targets
+
+
+@dataclass(frozen=True)
+class ExpirationTarget:
+    employee_id: str
+    employee_name: str
+    email: str
+    field_name: str
+    expiration_date: date
+    days_until_due: int
+    status: str
+
+    @property
+    def is_overdue(self) -> bool:
+        return self.expiration_date < date.today()
+
+    @property
+    def target_key(self) -> str:
+        return f"{self.employee_id}|{self.field_name}"
+
+
+@dataclass(frozen=True)
 class ReminderMessage:
-    request_id: str
+    target_key: str
     recipient: str
     subject: str
     body: str

@@ -1,79 +1,123 @@
 # Pulse
 
-### Team Members
-Colin Bertrand - Agentic AI Development
+Internal Python development app for managing associate information update requests from an Excel workbook.
 
-Chinmay Dave - Python Development
+The current MVP intentionally uses a local mock workbook instead of SharePoint. It provides:
 
-Liam Ben-Zvi - Integration to Outlook and Teams App
+- Excel-backed request storage with `Requests`, `AuditLog`, and `ReminderLog` sheets
+- Workbook upload through the web interface
+- Dashboard for request counts, overdue work, and reminder queue
+- Associate request forms that write submitted values back to Excel
+- Manager status updates
+- Manual reminder and escalation preparation
+- Development email logging, with an optional Outlook sender path for Windows machines
 
-Kavit Timbadia - Testing, Documentation
+## Run as an Internal Dev App
 
----
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+python scripts/create_mock_data.py
+python -m pulse_app
+```
 
-### Project Scope
+The app binds to `0.0.0.0:5000` by default so other users on the same internal network can open it with the server machine's IP address:
 
-Build an internal Python application that:
+```text
+http://SERVER_INTERNAL_IP:5000
+```
 
-- Reads requests from an Excel file stored on SharePoint
-- Provides a web interface for associates to complete forms to update information
-- Update form information back to Excel sheet
-- Automatically sends reminder emails for pending requests
-- Updates status back to Excel
-- Runs completely on internal machine/server with no cloud dependencies. (start as a python dev application)
-- Start with manual selection and sending, eventually automate processes with agentic AI
+On the server itself, this also works:
 
----
+```text
+http://127.0.0.1:5000
+```
 
-### Project Architecture
+The workbook is created at `data/pulse_requests_mock.xlsx`. To use another workbook path:
 
-1. **Data Layer**
+```bash
+PULSE_WORKBOOK_PATH=/path/to/requests.xlsx python -m pulse_app
+```
 
-- SharePoint Excel serves as the central repository for requests, records, user details, due dates, statuses, and reminder tracking
+## Automatic Reminder Agent
 
-2. **Application Layer**
+Pulse can run a background reminder agent inside the Flask process. The agent scans the Excel workbook, finds active requests due within the reminder window, sends reminders to associates, sends escalations to managers when a request is overdue with at least two prior reminders, and writes the reminder result back to Excel.
 
-- Standalone Python web application used to run and manage the request workflow
-- Built for internal use and hosted on an internal machine/server
-- Provides the user interface that associates can access
-- Handles backend processing including:
-  - Readin request data from SharePoint Excel
-  - Writing completed form data back to Excel
-  - Updating request statuses
-  - Triggering reminder and escalation emails
-- Uses Microsoft APIs and/or approved Outlook libraries, for Excel and email integration
-- Designed as the MVP foundation before adding automation from AI Agents and additional integration like microsoft Teams
+Automatic sending is opt-in so local test runs do not accidentally send real mail:
 
-3. **Automation Layer**
+```bash
+PULSE_EMAIL_BACKEND=outlook \
+PULSE_AUTO_REMINDERS=true \
+PULSE_APP_BASE_URL=http://SERVER_INTERNAL_IP:5000 \
+python -m pulse_app
+```
 
-      Independent AI/Python agents perform specific functions:
+PowerShell:
 
-- `Sync Agents`: Reads and synchronizes records from Excel
-- `Reminder Agents`: Identifies pending requests, creates messages, and sends automated reminder emails
-- `Form Processing Agents`: Updates request status and stores user responses
-- `Reporting Agents`: Generates operational and audit reports
+```powershell
+$env:PULSE_EMAIL_BACKEND="outlook"
+$env:PULSE_AUTO_REMINDERS="true"
+$env:PULSE_APP_BASE_URL="http://SERVER_INTERNAL_IP:5000"
+python -m pulse_app
+```
 
-    Agents will be configured after a working MVP is developed. Multiple agents may exist for each section stated above.
+Useful settings:
 
-4. **Communication Layer**
+```text
+PULSE_REMINDER_DAYS_AHEAD=3
+PULSE_REMINDER_SCAN_INTERVAL_SECONDS=300
+PULSE_REMINDER_COOLDOWN_HOURS=24
+PULSE_HOST=0.0.0.0
+PULSE_PORT=5000
+PULSE_DEBUG=false
+```
 
-- Integration with **Microsoft Product**
-  - Microsoft Outlook using Python (PyWin32/Outlook client libraries)
-- Reminder Agent automatically sends emails/messages to associates and escalation notifications when required
-- Email/message links direct users to the appropriate form within the application
+Keep the active workbook closed in Excel while the agent is running. Excel creates a `~$...xlsx` lock file when the workbook is open, and that prevents Pulse from saving reminder counts and logs.
 
-5. **User Access Layer**
+## SMTP Sending
 
-- Internal web portal allowing users to:
-  - View assigned reuests
-  - Complete forms
-  - Track submission status
-  - Access dashboards and reports
- 
+For cross-platform sending, set `PULSE_EMAIL_BACKEND=smtp` and provide SMTP settings:
 
-End users will interact with the solution through a web-based interface. 
-The Python application will provide the forms, dashboards, reporting, and workflow functionality, 
-while SharePoint Excel will remain the underlying data repository. 
-Users will not interact directly with the Excel file except for designated administrators or managers maintaining source records.
- 
+```powershell
+$env:PULSE_EMAIL_BACKEND="smtp"
+$env:PULSE_SMTP_HOST="smtp.example.com"
+$env:PULSE_SMTP_PORT="587"
+$env:PULSE_SMTP_USER="pulse@example.com"
+$env:PULSE_SMTP_PASSWORD="app-password"
+$env:PULSE_SMTP_USE_TLS="true"
+$env:PULSE_SMTP_FROM="pulse@example.com"
+$env:PULSE_AUTO_REMINDERS="true"
+$env:PULSE_APP_BASE_URL="http://SERVER_INTERNAL_IP:5000"
+python -m pulse_app
+```
 
+Use `PULSE_EMAIL_BACKEND=dev` for UI testing without sending real email.
+
+You can also upload a workbook from the web UI:
+
+```text
+Data Source -> Upload workbook
+```
+
+Uploaded workbooks must be `.xlsx` files with a `Requests` sheet and the required request columns. If `AuditLog` or `ReminderLog` sheets are missing, the app creates them.
+
+## Outlook Sending
+
+By default reminders are logged to Excel instead of sent. On a Windows internal machine with Outlook installed, set either `PULSE_EMAIL_BACKEND=outlook` or the older compatibility flag:
+
+```bash
+PULSE_USE_OUTLOOK=true python -m pulse_app
+```
+
+The Outlook integration uses `pywin32`, which is only installed on Windows from `requirements.txt`.
+
+## MVP Architecture
+
+- `pulse_app/excel_repository.py`: reads and writes workbook rows
+- `pulse_app/routes.py`: Flask web routes and form handling
+- `pulse_app/agents.py`: first manual reminder agent implementation
+- `pulse_app/email_service.py`: development logger and Outlook sender abstraction
+- `scripts/create_mock_data.py`: rebuilds the local mock Excel workbook
+
+Future SharePoint, Teams, and autonomous agent work can plug into these boundaries without changing the user-facing workflow.

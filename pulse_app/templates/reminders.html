@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Reminders{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <p class="eyebrow">Agent queue</p>
+    <h1>Reminders</h1>
+  </div>
+  <div class="button-row">
+    <form method="post">
+      <input type="hidden" name="request_id" value="automatic-once">
+      <button type="submit">Run agent now</button>
+    </form>
+    <form method="post">
+      <input type="hidden" name="request_id" value="all">
+      <button type="submit">Send all due</button>
+    </form>
+  </div>
+</section>
+
+<section class="agent-strip">
+  <div>
+    <span class="agent-label">Automatic agent</span>
+    <strong>{{ "Running" if agent_snapshot.running else ("Enabled" if agent_snapshot.enabled else "Disabled") }}</strong>
+  </div>
+  <div>
+    <span class="agent-label">Email channel</span>
+    <strong>{{ agent_snapshot.email_backend }}</strong>
+  </div>
+  <div>
+    <span class="agent-label">Eligible now</span>
+    <strong>{{ automatic_due|length }}</strong>
+  </div>
+  <div>
+    <span class="agent-label">Last result</span>
+    <strong>{{ agent_snapshot.last_result }}</strong>
+  </div>
+</section>
+
+<p class="muted">Showing pending requests due within {{ days_ahead }} days. The automatic agent only sends records outside the {{ cooldown_hours }} hour reminder cooldown.</p>
+
+<section class="reminder-list">
+  {% for record, message in messages %}
+    <article class="reminder-row">
+      <div>
+        <h2>{{ record.request_id }} / {{ record.title }}</h2>
+        <p>{{ record.assigned_to }} / {{ message.recipient }} / Due {{ record.due_date.strftime('%Y-%m-%d') }}</p>
+        <pre>{{ message.body }}</pre>
+      </div>
+      <form method="post">
+        <input type="hidden" name="request_id" value="{{ record.request_id }}">
+        <button type="submit">{{ "Escalate" if message.escalate else "Send" }}</button>
+      </form>
+    </article>
+  {% else %}
+    <div class="empty">No reminder messages are ready.</div>
+  {% endfor %}
+</section>
+{% endblock %}

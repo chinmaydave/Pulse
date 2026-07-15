@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Data Source{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <p class="eyebrow">Excel repository</p>
+    <h1>Data source</h1>
+  </div>
+</section>
+
+<section class="form-band single">
+  <form method="post" enctype="multipart/form-data" class="response-form">
+    <h2>Upload workbook</h2>
+    <p class="muted">The uploaded file becomes the active Excel repository for requests, statuses, reminders, and audit tracking.</p>
+    <label>
+      Excel workbook
+      <input type="file" name="workbook" accept=".xlsx" required>
+    </label>
+    <button type="submit">Upload and use workbook</button>
+  </form>
+
+  <div class="panel">
+    <h2>Current workbook</h2>
+    <pre>{{ workbook_path }}</pre>
+    <h2>Required Requests columns</h2>
+    <p class="muted">{{ required_headers }}</p>
+  </div>
+</section>
+{% endblock %}

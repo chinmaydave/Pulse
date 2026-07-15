@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Pulse Dashboard{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <p class="eyebrow">Internal workflow</p>
+    <h1>Request operations</h1>
+  </div>
+  <div class="workbook-path">Excel source: {{ workbook_path }}</div>
+</section>
+
+<section class="metrics">
+  <div class="metric"><span>Total</span><strong>{{ summary.total }}</strong></div>
+  <div class="metric"><span>Open</span><strong>{{ summary.open }}</strong></div>
+  <div class="metric"><span>In Progress</span><strong>{{ summary.in_progress }}</strong></div>
+  <div class="metric"><span>Submitted</span><strong>{{ summary.submitted }}</strong></div>
+  <div class="metric danger"><span>Overdue</span><strong>{{ summary.overdue }}</strong></div>
+  <div class="metric warning"><span>Escalated</span><strong>{{ summary.escalated }}</strong></div>
+</section>
+
+<section class="agent-strip">
+  <div>
+    <span class="agent-label">Automation</span>
+    <strong>{{ "Running" if agent_snapshot.running else ("Enabled" if agent_snapshot.enabled else "Disabled") }}</strong>
+  </div>
+  <div>
+    <span class="agent-label">Email channel</span>
+    <strong>{{ agent_snapshot.email_backend }}</strong>
+  </div>
+  <div>
+    <span class="agent-label">Scan cadence</span>
+    <strong>{{ agent_snapshot.scan_interval_seconds }}s / {{ agent_snapshot.cooldown_hours }}h cooldown</strong>
+  </div>
+  <div>
+    <span class="agent-label">Last scan</span>
+    <strong>{{ agent_snapshot.last_scan_at or "Not yet" }}</strong>
+  </div>
+</section>
+
+<section class="split">
+  <div>
+    <div class="section-title">
+      <h2>Active requests</h2>
+      <a href="{{ url_for('pulse.requests_index') }}">View all</a>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Assigned</th>
+          <th>Category</th>
+          <th>Due</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for record in records if record.is_pending %}
+          <tr>
+            <td><a href="{{ url_for('pulse.request_detail', request_id=record.request_id) }}">{{ record.request_id }}</a></td>
+            <td>{{ record.assigned_to }}</td>
+            <td>{{ record.category }}</td>
+            <td class="{{ 'overdue' if record.is_overdue else '' }}">{{ record.due_date.strftime('%Y-%m-%d') }}</td>
+            <td><span class="status">{{ record.status }}</span></td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" class="empty">No active requests.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div>
+    <div class="section-title">
+      <h2>Reminder queue</h2>
+      <a href="{{ url_for('pulse.reminders') }}">Prepare</a>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Associate</th>
+          <th>Due</th>
+          <th>Count</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for record in pending %}
+          <tr>
+            <td><a href="{{ url_for('pulse.request_detail', request_id=record.request_id) }}">{{ record.request_id }}</a></td>
+            <td>{{ record.assigned_to }}</td>
+            <td class="{{ 'overdue' if record.is_overdue else '' }}">{{ record.due_date.strftime('%Y-%m-%d') }}</td>
+            <td>{{ record.reminder_count }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4" class="empty">No reminders due.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

@@ -8,7 +8,7 @@ from werkzeug.utils import secure_filename
 
 from .agents import ReminderAgent
 from .email_service import email_service
-from .excel_repository import ExcelRepository, REQUEST_HEADERS
+from .excel_repository import ExcelRepository, EMPLOYEE_HEADERS
 
 
 bp = Blueprint("pulse", __name__)
@@ -77,7 +77,7 @@ def data_source():
     return render_template(
         "data_source.html",
         workbook_path=repository().workbook_path,
-        required_headers=", ".join(REQUEST_HEADERS),
+        required_headers=", ".join(EMPLOYEE_HEADERS),
     )
 
 
@@ -128,27 +128,45 @@ def reminders():
     cfg = config()
     mailer = email_service(cfg)
     agent = ReminderAgent(repository(), mailer, request.host_url.rstrip("/"))
+    expiration_filter = request.values.get("expiration_filter", "all")
 
     if request.method == "POST":
-        request_id = request.form.get("request_id", "")
-        if request_id == "automatic-once":
+        target_key = request.form.get("target_key", "")
+        if target_key == "automatic-once":
             results = automatic_agent().run_once()
             flash(f"Automatic agent processed {len(results)} reminder(s).", "success")
-        elif request_id == "all":
+        elif target_key == "all":
             results = agent.send_pending(cfg.reminder_days_ahead)
             flash(f"Processed {len(results)} pending reminders.", "success")
         else:
-            record = repository().get_request(request_id)
-            if record is None:
-                flash(f"Request {request_id} was not found.", "error")
+            target = repository().find_target_by_key(target_key)
+            if target is None:
+                flash(f"Reminder target {target_key} was not found.", "error")
             else:
-                result = agent.send_for_record(record)
-                flash(f"Reminder for {request_id}: {result['status']} ({result['recipient']}).", "success")
-        return redirect(url_for("pulse.reminders"))
+                result = agent.send_for_target(target)
+                flash(
+                    f"Reminder for {target.employee_name} ({target.field_name}): {result['status']} ({result['recipient']}).",
+                    "success",
+                )
+        return redirect(url_for("pulse.reminders", expiration_filter=expiration_filter))
 
-    pending = repository().pending_for_reminder(cfg.reminder_days_ahead)
-    automatic_due = agent.due_for_automatic_send(cfg.reminder_days_ahead, cfg.reminder_cooldown_hours)
-    messages = [(record, agent.build_message(record)) for record in pending]
+    pending = repository().pending_for_reminder(
+        cfg.reminder_days_ahead,
+        None if expiration_filter == "all" else expiration_filter,
+    )
+    automatic_due = agent.due_for_automatic_send(
+        cfg.reminder_days_ahead,
+        cfg.reminder_cooldown_hours,
+        pending,
+    )
+    filter_label = {
+        "all": "All expiring records",
+        "overdue": "Overdue",
+        "30": "Expires in 30 days or less",
+        "14": "Expires in 14 days or less",
+        "7": "Expires in 7 days or less",
+    }.get(expiration_filter, "All expiring records")
+    messages = [(target, agent.build_message(target)) for target in pending]
     return render_template(
         "reminders.html",
         messages=messages,
@@ -156,6 +174,8 @@ def reminders():
         days_ahead=cfg.reminder_days_ahead,
         cooldown_hours=cfg.reminder_cooldown_hours,
         agent_snapshot=automatic_agent().snapshot(),
+        expiration_filter=expiration_filter,
+        filter_label=filter_label,
     )
 
 

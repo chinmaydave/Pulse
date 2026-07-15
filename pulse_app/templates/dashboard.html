@@ -78,21 +78,23 @@
       <thead>
         <tr>
           <th>ID</th>
-          <th>Associate</th>
+          <th>Employee</th>
+          <th>Field</th>
           <th>Due</th>
-          <th>Count</th>
+          <th>Status</th>
         </tr>
       </thead>
       <tbody>
         {% for record in pending %}
           <tr>
-            <td><a href="{{ url_for('pulse.request_detail', request_id=record.request_id) }}">{{ record.request_id }}</a></td>
-            <td>{{ record.assigned_to }}</td>
-            <td class="{{ 'overdue' if record.is_overdue else '' }}">{{ record.due_date.strftime('%Y-%m-%d') }}</td>
-            <td>{{ record.reminder_count }}</td>
+            <td>{{ record.employee_id }}</td>
+            <td>{{ record.employee_name }}</td>
+            <td>{{ record.field_name }}</td>
+            <td class="{{ 'overdue' if record.is_overdue else '' }}">{{ record.expiration_date.strftime('%Y-%m-%d') }}</td>
+            <td>{{ record.status.replace('_', ' ').title() }}</td>
           </tr>
         {% else %}
-          <tr><td colspan="4" class="empty">No reminders due.</td></tr>
+          <tr><td colspan="5" class="empty">No reminders due.</td></tr>
         {% endfor %}
       </tbody>
     </table>

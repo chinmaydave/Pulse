@@ -7,7 +7,7 @@ from time import monotonic
 
 from .email_service import EmailService
 from .excel_repository import ExcelRepository
-from .models import ReminderMessage, RequestRecord
+from .models import ExpirationTarget, ReminderMessage
 
 
 class ReminderAgent:
@@ -16,63 +16,80 @@ class ReminderAgent:
         self.mailer = mailer
         self.app_base_url = app_base_url.rstrip("/")
 
-    def build_message(self, record: RequestRecord) -> ReminderMessage:
-        form_url = f"{self.app_base_url}/requests/{record.request_id}"
-        escalate = record.is_overdue and record.reminder_count >= 2
-        recipient = record.manager_email if escalate else record.associate_email
+    def build_message(self, target: ExpirationTarget) -> ReminderMessage:
+        escalate = target.is_overdue
+        recipient = target.email
         subject_prefix = "Escalation" if escalate else "Reminder"
-        subject = f"{subject_prefix}: {record.title} ({record.request_id})"
+        subject = f"{subject_prefix}: {target.field_name} expiring for {target.employee_name}"
         body = (
-            f"Request: {record.title}\n"
-            f"Request ID: {record.request_id}\n"
-            f"Assigned to: {record.assigned_to}\n"
-            f"Due date: {record.due_date:%Y-%m-%d}\n"
-            f"Status: {record.status}\n\n"
-            f"Please complete the form here:\n{form_url}\n\n"
-            f"Requested change:\n{record.requested_change}\n"
+            f"Employee: {target.employee_name}\n"
+            f"Employee ID: {target.employee_id}\n"
+            f"Field: {target.field_name}\n"
+            f"Expiration date: {target.expiration_date:%Y-%m-%d}\n"
+            f"Days until due: {target.days_until_due}\n"
+            f"Status: {self._status_text(target)}\n\n"
+            f"Please review the expiring document and take action accordingly."
         )
         return ReminderMessage(
-            request_id=record.request_id,
+            target_key=target.target_key,
             recipient=recipient,
             subject=subject,
             body=body,
             escalate=escalate,
         )
 
-    def send_for_record(self, record: RequestRecord) -> dict[str, str]:
-        message = self.build_message(record)
+    def _status_text(self, target: ExpirationTarget) -> str:
+        if target.is_overdue:
+            return "Overdue"
+        if target.days_until_due <= 7:
+            return "Due within 7 days"
+        if target.days_until_due <= 14:
+            return "Due within 14 days"
+        if target.days_until_due <= 30:
+            return "Due within 30 days"
+        return "Upcoming"
+
+    def send_for_target(self, target: ExpirationTarget) -> dict[str, str]:
+        message = self.build_message(target)
         result = self.mailer.send(message)
         self.repository.record_reminder(
-            request_id=record.request_id,
+            target=target,
             recipient=message.recipient,
             subject=message.subject,
             message_preview=message.body,
             channel=result.channel,
             status=result.status,
-            escalate=message.escalate,
         )
         return {
-            "request_id": record.request_id,
+            "target_key": target.target_key,
+            "employee_id": target.employee_id,
             "recipient": message.recipient,
             "status": result.status,
             "detail": result.detail,
         }
 
     def send_pending(self, days_ahead: int) -> list[dict[str, str]]:
-        return [self.send_for_record(record) for record in self.repository.pending_for_reminder(days_ahead)]
+        return [self.send_for_target(target) for target in self.repository.pending_for_reminder(days_ahead)]
 
-    def due_for_automatic_send(self, days_ahead: int, cooldown_hours: int) -> list[RequestRecord]:
+    def due_for_automatic_send(
+        self,
+        days_ahead: int,
+        cooldown_hours: int,
+        pending_targets: list[ExpirationTarget] | None = None,
+    ) -> list[ExpirationTarget]:
         cutoff = datetime.now() - timedelta(hours=cooldown_hours)
+        candidates = pending_targets if pending_targets is not None else self.repository.pending_for_reminder(days_ahead)
         return [
-            record
-            for record in self.repository.pending_for_reminder(days_ahead)
-            if record.last_reminder_at is None or record.last_reminder_at <= cutoff
+            target
+            for target in candidates
+            if self.repository.last_reminder_for_target(target.target_key) is None
+            or self.repository.last_reminder_for_target(target.target_key) <= cutoff
         ]
 
     def send_due_automatic(self, days_ahead: int, cooldown_hours: int) -> list[dict[str, str]]:
         return [
-            self.send_for_record(record)
-            for record in self.due_for_automatic_send(days_ahead, cooldown_hours)
+            self.send_for_target(target)
+            for target in self.due_for_automatic_send(days_ahead, cooldown_hours)
         ]
 
 
@@ -135,16 +152,16 @@ class AutomaticReminderAgent:
 
         self._last_scan_at = datetime.now()
         agent = ReminderAgent(self.repository, self.mailer, self.app_base_url)
-        records = [
-            record
-            for record in agent.due_for_automatic_send(self.days_ahead, self.cooldown_hours)
-            if self._not_attempted_recently(record)
+        targets = [
+            target
+            for target in agent.due_for_automatic_send(self.days_ahead, self.cooldown_hours)
+            if self._not_attempted_recently(target)
         ]
 
         results = []
-        for record in records:
-            self._remember_attempt(record)
-            results.append(agent.send_for_record(record))
+        for target in targets:
+            self._remember_attempt(target)
+            results.append(agent.send_for_target(target))
 
         with self._lock:
             self._processed_count += len(results)
@@ -178,15 +195,15 @@ class AutomaticReminderAgent:
                     self._last_result = f"{type(exc).__name__}: {exc}"
             self._stop_event.wait(self.scan_interval_seconds)
 
-    def _not_attempted_recently(self, record: RequestRecord) -> bool:
-        attempted_at = self._recent_attempts.get(record.request_id)
+    def _not_attempted_recently(self, target: ExpirationTarget) -> bool:
+        attempted_at = self._recent_attempts.get(target.target_key)
         if attempted_at is None:
             return True
         cooldown_seconds = self.cooldown_hours * 60 * 60
         return monotonic() - attempted_at >= cooldown_seconds
 
-    def _remember_attempt(self, record: RequestRecord) -> None:
-        self._recent_attempts[record.request_id] = monotonic()
+    def _remember_attempt(self, target: ExpirationTarget) -> None:
+        self._recent_attempts[target.target_key] = monotonic()
 
     def _set_result(self, result: str) -> None:
         with self._lock:

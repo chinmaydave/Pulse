@@ -57,13 +57,16 @@ Keep the active workbook closed in Excel while the agent is running. Excel creat
 
 ## Email Sending
 
-Pulse sends through Outlook using only the Excel workbook. There is no Email Settings tab, no password entry, and no command-line email setup.
+Pulse chooses the sender based on the Excel `Manager Email` column. There is no Email Settings tab and no command-line email setup.
 
 ```text
 Reminders -> Send
 ```
 
-The receiver comes from the `Email` column. The sender/delegate address comes from the `Manager Email` column. The machine running Pulse must already be signed into Outlook. If Outlook does not allow the signed-in user to send on behalf of the manager mailbox, Outlook will reject the send.
+The receiver comes from the `Email` column. The sender comes from the `Manager Email` column.
+
+- Gmail manager senders use Gmail SMTP on Mac and Windows. Pulse asks for that Gmail account's app password on the Reminders page the first time it sees the sender.
+- Non-Gmail manager senders use Outlook desktop. The machine running Pulse must already be signed into Outlook, and Outlook must allow send-on-behalf for that manager mailbox.
 
 Connect the workbook from the web UI:
 
@@ -88,7 +91,7 @@ Pulse adds and maintains reminder/audit sheets in its active workbook copy. Use 
 - `pulse_app/excel_repository.py`: reads employee expiration rows and writes reminder/audit rows
 - `pulse_app/routes.py`: Flask web routes and form handling
 - `pulse_app/agents.py`: first manual reminder agent implementation
-- `pulse_app/email_service.py`: Outlook sender abstraction
+- `pulse_app/email_service.py`: Excel-routed Gmail/Outlook sender abstraction
 - `pulse_app/onedrive_source.py`: downloads an accessible OneDrive Excel URL into the app
 - `scripts/create_mock_data.py`: rebuilds the local mock Excel workbook
 

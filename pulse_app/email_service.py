@@ -5,6 +5,7 @@ from sys import platform
 from typing import TYPE_CHECKING
 
 from .models import ReminderMessage
+from .sender_credentials import is_gmail_address, load_sender_credentials
 
 if TYPE_CHECKING:
     from .config import AppConfig
@@ -58,11 +59,66 @@ class OutlookEmailService(EmailService):
         )
 
 
+class GmailEmailService(EmailService):
+    def __init__(self, config: "AppConfig"):
+        self.config = config
+
+    def send(self, message: ReminderMessage) -> SendResult:
+        sender = message.sender.strip().lower()
+        password = load_sender_credentials(self.config).get(sender)
+        if not password:
+            return SendResult(
+                channel="gmail",
+                status="error",
+                detail=f"Gmail app password is not saved for {sender}.",
+            )
+
+        import smtplib
+        from email.message import EmailMessage
+
+        email = EmailMessage()
+        email["From"] = sender
+        email["To"] = message.recipient
+        email["Subject"] = message.subject
+        email.set_content(message.body)
+
+        try:
+            with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
+                server.starttls()
+                server.login(sender, password)
+                server.send_message(email)
+        except Exception as exc:  # noqa: BLE001 - surface provider errors in the UI/log
+            return SendResult(
+                channel="gmail",
+                status="error",
+                detail=f"Gmail send failed for {sender}: {exc}",
+            )
+
+        return SendResult(
+            channel="gmail",
+            status="sent",
+            detail=f"Sent through Gmail from {sender} to {message.recipient}.",
+        )
+
+
+class ExcelRoutedEmailService(EmailService):
+    def __init__(self, config: "AppConfig"):
+        self.gmail = GmailEmailService(config)
+        self.outlook = OutlookEmailService()
+
+    def send(self, message: ReminderMessage) -> SendResult:
+        if message.sender and is_gmail_address(message.sender):
+            return self.gmail.send(message)
+        return self.outlook.send(message)
+
+
 def email_service(config: "AppConfig | bool") -> EmailService:
     if isinstance(config, bool):
         return OutlookEmailService() if config else DevelopmentEmailService()
 
     backend = getattr(config, "email_backend", "dev")
+    if backend == "excel":
+        return ExcelRoutedEmailService(config)
     if backend == "outlook":
         return OutlookEmailService()
     return DevelopmentEmailService()

@@ -8,6 +8,7 @@ from .agents import ReminderAgent
 from .email_service import email_service
 from .excel_repository import ExcelRepository, EMPLOYEE_HEADERS
 from .onedrive_source import download_onedrive_workbook
+from .sender_credentials import gmail_senders_missing_credentials, save_gmail_app_password
 
 
 bp = Blueprint("pulse", __name__)
@@ -160,6 +161,20 @@ def reminders():
     expiration_filter = request.values.get("expiration_filter", "all")
 
     if request.method == "POST":
+        action = request.form.get("action", "")
+        if action == "save-gmail-sender":
+            try:
+                save_gmail_app_password(
+                    cfg,
+                    request.form.get("gmail_sender", ""),
+                    request.form.get("gmail_app_password", ""),
+                )
+            except ValueError as exc:
+                flash(str(exc), "error")
+            else:
+                flash("Gmail sender password saved for reminder sending.", "success")
+            return redirect(url_for("pulse.reminders", expiration_filter=expiration_filter))
+
         target_key = request.form.get("target_key", "")
         if target_key == "automatic-once":
             results = automatic_agent().run_once()
@@ -201,6 +216,7 @@ def reminders():
     return render_template(
         "reminders.html",
         messages=messages,
+        missing_gmail_senders=gmail_senders_missing_credentials(cfg, pending),
         automatic_due=automatic_due,
         days_ahead=cfg.reminder_days_ahead,
         cooldown_hours=cfg.reminder_cooldown_hours,

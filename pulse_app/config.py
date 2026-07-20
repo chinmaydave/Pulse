@@ -29,7 +29,7 @@ class AppConfig:
     upload_dir: Path = BASE_DIR / "data" / "uploads"
     app_base_url: str = "http://127.0.0.1:5000"
     auto_reminders_enabled: bool = True
-    email_backend: str = "outlook"
+    email_backend: str = "excel"
     data_backend: str = "excel"
     onedrive: OneDriveSettings = field(default_factory=OneDriveSettings)
     reminder_days_ahead: int = 3
@@ -42,7 +42,7 @@ class AppConfig:
     @property
     def use_outlook(self) -> bool:
         # Preserved so existing callers/templates that read use_outlook still work.
-        return self.email_backend == "outlook"
+        return self.email_backend in {"excel", "outlook"}
 
     @classmethod
     def from_env(cls) -> "AppConfig":
@@ -54,7 +54,7 @@ class AppConfig:
             upload_dir=Path(os.getenv("PULSE_UPLOAD_DIR", BASE_DIR / "data" / "uploads")),
             app_base_url=os.getenv("PULSE_APP_BASE_URL", "http://127.0.0.1:5000"),
             auto_reminders_enabled=_env_bool("PULSE_AUTO_REMINDERS", True),
-            email_backend="outlook",
+            email_backend="excel",
             data_backend=os.getenv("PULSE_DATA_BACKEND", "excel").strip().lower(),
             onedrive=OneDriveSettings.from_env(),
             reminder_days_ahead=int(os.getenv("PULSE_REMINDER_DAYS_AHEAD", "3")),

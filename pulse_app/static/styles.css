@@ -344,6 +344,12 @@ pre {
   align-content: start;
 }
 
+.inline-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
 .alerts {
   display: grid;
   gap: 8px;

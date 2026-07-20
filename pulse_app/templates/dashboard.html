@@ -3,10 +3,12 @@
 {% block content %}
 <section class="page-heading">
   <div>
-    <p class="eyebrow">Passport compliance</p>
-    <h1>Passport expiry operations</h1>
+    <p class="eyebrow">Document compliance</p>
+    <h1>Expiration operations</h1>
   </div>
-  <div class="workbook-path">Excel source: {{ workbook_path }}</div>
+  <div class="workbook-path">
+    Excel source: {{ "OneDrive workbook" if onedrive_source_url else workbook_path }}
+  </div>
 </section>
 
 <section class="metrics">
@@ -46,7 +48,7 @@
           <th>Title</th>
           <th>Name</th>
           <th>Email</th>
-          <th>Passport Expiry</th>
+          <th>Expirary Date</th>
         </tr>
       </thead>
       <tbody>
@@ -55,7 +57,7 @@
             <td>{{ record.title }}</td>
             <td>{{ record.name }}</td>
             <td>{{ record.email }}</td>
-            <td>{{ record.passport_valid_until.strftime('%Y-%m-%d') if record.passport_valid_until else "Missing" }}</td>
+            <td>{{ record.expiration_date.strftime('%Y-%m-%d') if record.expiration_date else "Missing" }}</td>
           </tr>
         {% else %}
           <tr><td colspan="4" class="empty">No employees loaded.</td></tr>

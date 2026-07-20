@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 from pathlib import Path
-from shutil import copyfileobj
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
-from werkzeug.utils import secure_filename
 
 from .agents import ReminderAgent
 from .email_service import email_service
+from .email_settings import (
+    clear_email_settings,
+    display_email_settings,
+    effective_email_config,
+    save_email_settings,
+)
 from .excel_repository import ExcelRepository, EMPLOYEE_HEADERS
+from .models import ReminderMessage
 from .onedrive_source import download_onedrive_workbook
 
 
@@ -29,12 +34,50 @@ def set_repository(workbook_path: Path) -> None:
         current_app.pulse_automatic_agent.repository = current_app.pulse_repository
 
 
+def onedrive_source_path() -> Path:
+    return config().upload_dir / "active_onedrive_url.txt"
+
+
+def read_onedrive_source_url() -> str:
+    source_path = onedrive_source_path()
+    if not source_path.exists():
+        return ""
+    return source_path.read_text(encoding="utf-8").strip()
+
+
+def activate_onedrive_workbook(source_url: str) -> Path:
+    cfg = config()
+    cfg.upload_dir.mkdir(parents=True, exist_ok=True)
+    uploaded_path = cfg.upload_dir / "onedrive_expirations.xlsx"
+    pending_path = cfg.upload_dir / "onedrive_expirations.pending.xlsx"
+    pending_path.unlink(missing_ok=True)
+    download_onedrive_workbook(source_url, pending_path)
+    ExcelRepository.validate_workbook(pending_path)
+    pending_path.replace(uploaded_path)
+    onedrive_source_path().write_text(source_url.strip(), encoding="utf-8")
+    set_repository(uploaded_path)
+    return uploaded_path
+
+
 def automatic_agent():
     return current_app.pulse_automatic_agent
 
 
+def runtime_config():
+    return effective_email_config(config())
+
+
+def sync_runtime_email_settings() -> None:
+    cfg = runtime_config()
+    agent = automatic_agent()
+    agent.mailer = email_service(cfg)
+    agent.email_backend = cfg.email_backend
+    agent.use_outlook = cfg.use_outlook
+
+
 @bp.route("/")
 def dashboard():
+    sync_runtime_email_settings()
     records = repository().list_employees()
     return render_template(
         "dashboard.html",
@@ -42,58 +85,47 @@ def dashboard():
         records=records,
         pending=repository().pending_for_reminder(config().reminder_days_ahead),
         workbook_path=repository().workbook_path,
+        onedrive_source_url=read_onedrive_source_url(),
         agent_snapshot=automatic_agent().snapshot(),
     )
 
 
 @bp.route("/data-source", methods=["GET", "POST"])
 def data_source():
-    cfg = config()
     if request.method == "POST":
+        action = request.form.get("action", "connect")
+        if action == "refresh-onedrive":
+            source_url = read_onedrive_source_url()
+            if not source_url:
+                flash("Paste and connect a OneDrive Excel URL before refreshing.", "error")
+                return redirect(url_for("pulse.data_source"))
+            try:
+                activate_onedrive_workbook(source_url)
+            except Exception as exc:
+                flash(str(exc), "error")
+                return redirect(url_for("pulse.data_source"))
+
+            flash("OneDrive workbook refreshed from the saved link.", "success")
+            return redirect(url_for("pulse.dashboard"))
+
         source_url = request.form.get("onedrive_url", "").strip()
         if source_url:
-            cfg.upload_dir.mkdir(parents=True, exist_ok=True)
-            uploaded_path = cfg.upload_dir / "onedrive_passport_expirations.xlsx"
             try:
-                download_onedrive_workbook(source_url, uploaded_path)
-                ExcelRepository.validate_workbook(uploaded_path)
-                set_repository(uploaded_path)
+                activate_onedrive_workbook(source_url)
             except Exception as exc:
-                uploaded_path.unlink(missing_ok=True)
                 flash(str(exc), "error")
                 return redirect(url_for("pulse.data_source"))
 
             flash("OneDrive workbook connected and activated.", "success")
             return redirect(url_for("pulse.dashboard"))
 
-        upload = request.files.get("workbook")
-        if not upload or not upload.filename:
-            flash("Choose an Excel workbook to upload or paste a OneDrive Excel URL.", "error")
-            return redirect(url_for("pulse.data_source"))
-        if not upload.filename.lower().endswith(".xlsx"):
-            flash("Upload a .xlsx workbook.", "error")
-            return redirect(url_for("pulse.data_source"))
-
-        cfg.upload_dir.mkdir(parents=True, exist_ok=True)
-        filename = secure_filename(upload.filename)
-        uploaded_path = cfg.upload_dir / filename
-        with uploaded_path.open("wb") as target:
-            copyfileobj(upload.stream, target)
-
-        try:
-            ExcelRepository.validate_workbook(uploaded_path)
-            set_repository(uploaded_path)
-        except Exception as exc:
-            uploaded_path.unlink(missing_ok=True)
-            flash(str(exc), "error")
-            return redirect(url_for("pulse.data_source"))
-
-        flash(f"Workbook uploaded and activated: {filename}", "success")
-        return redirect(url_for("pulse.dashboard"))
+        flash("Paste a OneDrive Excel URL.", "error")
+        return redirect(url_for("pulse.data_source"))
 
     return render_template(
         "data_source.html",
         workbook_path=repository().workbook_path,
+        onedrive_source_url=read_onedrive_source_url(),
         required_headers=", ".join(EMPLOYEE_HEADERS),
     )
 
@@ -142,7 +174,8 @@ def update_status(request_id: str):
 
 @bp.route("/reminders", methods=["GET", "POST"])
 def reminders():
-    cfg = config()
+    sync_runtime_email_settings()
+    cfg = runtime_config()
     mailer = email_service(cfg)
     agent = ReminderAgent(repository(), mailer, request.host_url.rstrip("/"))
     expiration_filter = request.values.get("expiration_filter", "all")
@@ -161,9 +194,11 @@ def reminders():
                 flash(f"Reminder target {target_key} was not found.", "error")
             else:
                 result = agent.send_for_target(target)
+                category = "success" if result["status"] == "sent" else "error"
                 flash(
-                    f"Reminder for {target.employee_name} ({target.field_name}): {result['status']} ({result['recipient']}).",
-                    "success",
+                    f"Reminder for {target.employee_name} ({target.field_name}): "
+                    f"{result['status']} to {result['recipient']}. {result['detail']}",
+                    category,
                 )
         return redirect(url_for("pulse.reminders", expiration_filter=expiration_filter))
 
@@ -194,6 +229,55 @@ def reminders():
         expiration_filter=expiration_filter,
         filter_label=filter_label,
     )
+
+
+@bp.route("/email-settings", methods=["GET", "POST"])
+def email_settings():
+    if request.method == "POST":
+        action = request.form.get("action", "save")
+        if action == "clear":
+            clear_email_settings(config())
+            sync_runtime_email_settings()
+            flash("Email settings cleared. Pulse is back in development logging mode.", "success")
+            return redirect(url_for("pulse.email_settings"))
+
+        if action == "test":
+            cfg = runtime_config()
+            recipient = request.form.get("test_recipient", "").strip() or cfg.smtp.from_address
+            sender = request.form.get("test_sender", "").strip()
+            result = email_service(cfg).send(
+                ReminderMessage(
+                    target_key="email-settings-test",
+                    recipient=recipient,
+                    subject="Pulse email test",
+                    body="Pulse test email sent from the Email Settings page.",
+                    sender=sender,
+                )
+            )
+            category = "success" if result.status == "sent" else "error"
+            flash(f"Test email {result.status} to {recipient}. {result.detail}", category)
+            return redirect(url_for("pulse.email_settings"))
+
+        password = request.form.get("password", "")
+        existing = display_email_settings(config())
+        form_data = request.form.to_dict()
+        if not password and existing.get("password_saved"):
+            form_data["password"] = load_saved_password()
+        save_email_settings(config(), form_data)
+        sync_runtime_email_settings()
+        flash("Email settings saved. Reminder sends will use these SMTP settings now.", "success")
+        return redirect(url_for("pulse.email_settings"))
+
+    settings = display_email_settings(config())
+    return render_template(
+        "email_settings.html",
+        settings=settings,
+        active_backend=runtime_config().email_backend,
+    )
+
+
+def load_saved_password() -> str:
+    return effective_email_config(config()).smtp.password
 
 
 @bp.route("/reports")

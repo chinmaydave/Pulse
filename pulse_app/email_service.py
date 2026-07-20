@@ -27,7 +27,7 @@ class DevelopmentEmailService(EmailService):
         return SendResult(
             channel="development-log",
             status="logged",
-            detail=f"Development reminder prepared for {message.recipient}.",
+            detail=f"Development reminder prepared from {message.sender or 'default sender'} to {message.recipient}.",
         )
 
 
@@ -47,7 +47,8 @@ class SmtpEmailService(EmailService):
         from email.message import EmailMessage
 
         email = EmailMessage()
-        email["From"] = self.settings.from_address
+        sender = message.sender or self.settings.from_address
+        email["From"] = sender
         email["To"] = message.recipient
         email["Subject"] = message.subject
         email.set_content(message.body)
@@ -77,7 +78,7 @@ class SmtpEmailService(EmailService):
         return SendResult(
             channel="smtp",
             status="sent",
-            detail=f"Sent through SMTP to {message.recipient}.",
+            detail=f"Sent through SMTP from {sender} to {message.recipient}.",
         )
 
 
@@ -95,10 +96,17 @@ class OutlookEmailService(EmailService):
         outlook = win32com.client.Dispatch("Outlook.Application")
         mail = outlook.CreateItem(0)
         mail.To = message.recipient
+        if message.sender:
+            mail.SentOnBehalfOfName = message.sender
         mail.Subject = message.subject
         mail.Body = message.body
         mail.Send()
-        return SendResult(channel="outlook", status="sent", detail="Sent through Outlook.")
+        sender_detail = f" from {message.sender}" if message.sender else ""
+        return SendResult(
+            channel="outlook",
+            status="sent",
+            detail=f"Sent through Outlook{sender_detail} to {message.recipient}.",
+        )
 
 
 def email_service(config: "AppConfig | bool") -> EmailService:

@@ -8,7 +8,7 @@ from pulse_app.excel_repository import ExcelRepository  # noqa: E402
 
 
 def main() -> None:
-    workbook_path = ROOT / "data" / "pulse_passport_expirations_mock.xlsx"
+    workbook_path = ROOT / "data" / "EmployeeExpirations_OneDrive_Template.xlsx"
     if workbook_path.exists():
         workbook_path.unlink()
     ExcelRepository(workbook_path)

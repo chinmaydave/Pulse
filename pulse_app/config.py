@@ -49,7 +49,7 @@ class OneDriveSettings:
 
 
 def _resolve_backend() -> str:
-    """dev (default) | smtp | outlook.
+    """outlook (default) | dev | smtp.
 
     PULSE_EMAIL_BACKEND wins if set. Otherwise PULSE_USE_OUTLOOK=true is honored
     for backward compatibility with the original Outlook-only flag.
@@ -57,9 +57,9 @@ def _resolve_backend() -> str:
     backend = os.getenv("PULSE_EMAIL_BACKEND", "").strip().lower()
     if backend:
         return backend
-    if _env_bool("PULSE_USE_OUTLOOK", False):
+    if _env_bool("PULSE_USE_OUTLOOK", True):
         return "outlook"
-    return "dev"
+    return "outlook"
 
 
 @dataclass(frozen=True)
@@ -67,8 +67,8 @@ class AppConfig:
     workbook_path: Path
     upload_dir: Path = BASE_DIR / "data" / "uploads"
     app_base_url: str = "http://127.0.0.1:5000"
-    auto_reminders_enabled: bool = False
-    email_backend: str = "dev"
+    auto_reminders_enabled: bool = True
+    email_backend: str = "outlook"
     smtp: SmtpSettings = field(default_factory=SmtpSettings)
     data_backend: str = "excel"
     onedrive: OneDriveSettings = field(default_factory=OneDriveSettings)
@@ -87,13 +87,13 @@ class AppConfig:
     @classmethod
     def from_env(cls) -> "AppConfig":
         workbook_path = Path(
-            os.getenv("PULSE_WORKBOOK_PATH", BASE_DIR / "data" / "pulse_passport_expirations_mock.xlsx")
+            os.getenv("PULSE_WORKBOOK_PATH", BASE_DIR / "data" / "EmployeeExpirations_OneDrive_Template.xlsx")
         )
         return cls(
             workbook_path=workbook_path,
             upload_dir=Path(os.getenv("PULSE_UPLOAD_DIR", BASE_DIR / "data" / "uploads")),
             app_base_url=os.getenv("PULSE_APP_BASE_URL", "http://127.0.0.1:5000"),
-            auto_reminders_enabled=os.getenv("PULSE_AUTO_REMINDERS", "false").lower() == "true",
+            auto_reminders_enabled=_env_bool("PULSE_AUTO_REMINDERS", True),
             email_backend=_resolve_backend(),
             smtp=SmtpSettings.from_env(),
             data_backend=os.getenv("PULSE_DATA_BACKEND", "excel").strip().lower(),

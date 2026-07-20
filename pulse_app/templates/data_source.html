@@ -10,29 +10,30 @@
 
 <section class="form-band single">
   <form method="post" class="response-form">
-    <h2>Use OneDrive workbook</h2>
-    <p class="muted">Paste a OneDrive Excel sharing or download URL. Pulse downloads the workbook, validates it, and uses passport expiry dates for reminder emails.</p>
+    <input type="hidden" name="action" value="connect">
+    <h2>Connect OneDrive workbook</h2>
+    <p class="muted">Paste a OneDrive Excel sharing link. Pulse downloads the workbook, validates it, and uses the expiration dates for reminder emails.</p>
     <label>
       OneDrive Excel URL
-      <input type="url" name="onedrive_url" placeholder="https://.../PassportExpirations.xlsx">
+      <input type="url" name="onedrive_url" placeholder="https://1drv.ms/x/..." required>
     </label>
     <button type="submit">Use OneDrive workbook</button>
-  </form>
-
-  <form method="post" enctype="multipart/form-data" class="response-form">
-    <h2>Upload workbook instead</h2>
-    <p class="muted">Use this for local testing with the same workbook format.</p>
-    <label>
-      Excel workbook
-      <input type="file" name="workbook" accept=".xlsx">
-    </label>
-    <button type="submit">Upload and use workbook</button>
   </form>
 
   <div class="panel">
     <h2>Current workbook</h2>
     <pre>{{ workbook_path }}</pre>
-    <h2>Required passport expiry columns</h2>
+    <h2>Saved OneDrive source</h2>
+    {% if onedrive_source_url %}
+      <pre>{{ onedrive_source_url }}</pre>
+      <form method="post" class="inline-form">
+        <input type="hidden" name="action" value="refresh-onedrive">
+        <button type="submit">Refresh from OneDrive</button>
+      </form>
+    {% else %}
+      <p class="muted">No OneDrive source is connected yet.</p>
+    {% endif %}
+    <h2>Required expiration columns</h2>
     <p class="muted">{{ required_headers }}</p>
   </div>
 </section>

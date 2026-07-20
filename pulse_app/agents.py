@@ -28,13 +28,14 @@ class ReminderAgent:
             f"Expiration date: {target.expiration_date:%Y-%m-%d}\n"
             f"Days until due: {target.days_until_due}\n"
             f"Status: {self._status_text(target)}\n\n"
-            f"Please review the passport expiration and take action accordingly."
+            f"Please review the expiring item and take action accordingly."
         )
         return ReminderMessage(
             target_key=target.target_key,
             recipient=recipient,
             subject=subject,
             body=body,
+            sender=target.manager_email,
             escalate=escalate,
         )
 
@@ -64,6 +65,7 @@ class ReminderAgent:
             "target_key": target.target_key,
             "employee_id": target.employee_id,
             "recipient": message.recipient,
+            "sender": message.sender,
             "status": result.status,
             "detail": result.detail,
         }

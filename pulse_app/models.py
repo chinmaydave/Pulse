@@ -54,7 +54,7 @@ class EmployeeRecord:
     name: str
     email: str
     manager_email: str
-    passport_valid_until: date | None
+    expiration_date: date | None
 
     @property
     def employee_id(self) -> str:
@@ -62,7 +62,7 @@ class EmployeeRecord:
 
     def expiration_fields(self) -> list[tuple[str, date | None]]:
         return [
-            ("Passport Expiry Date", self.passport_valid_until),
+            (self.title, self.expiration_date),
         ]
 
     def expiration_targets(self) -> list["ExpirationTarget"]:
@@ -105,7 +105,7 @@ class ExpirationTarget:
 
     @property
     def target_key(self) -> str:
-        return f"{self.employee_id}|{self.field_name}"
+        return f"{self.email}|{self.field_name}"
 
 
 @dataclass(frozen=True)
@@ -114,4 +114,5 @@ class ReminderMessage:
     recipient: str
     subject: str
     body: str
+    sender: str = ""
     escalate: bool = False

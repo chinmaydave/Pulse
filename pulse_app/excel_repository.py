@@ -47,7 +47,7 @@ EMPLOYEE_HEADERS = [
     "Name",
     "Email",
     "Manager Email",
-    "Passport Expiry Date",
+    "Expirary Date",
 ]
 
 AUDIT_HEADERS = ["timestamp", "record_id", "actor", "action", "details"]
@@ -125,27 +125,31 @@ class ExcelRepository:
 
         today = date.today()
         rows = [
-            [
-                "Passport Renewal",
-                "Avery Johnson",
-                "avery.johnson@example.com",
-                "manager.hr@example.com",
-                today + timedelta(days=30),
-            ],
-            [
-                "Passport Renewal",
-                "Blake Smith",
-                "blake.smith@example.com",
-                "manager.hr@example.com",
-                today - timedelta(days=1),
-            ],
-            [
-                "Passport Renewal",
-                "Casey Lee",
-                "casey.lee@example.com",
-                "manager.hr@example.com",
-                today + timedelta(days=365),
-            ],
+            ["Gmail SMTP Test Reminder", "Chinmay Dave", "chinmaydavecs@gmail.com", "chinmaydaveatl@gmail.com", today],
+            ["Driver License Renewal", "Blake Smith", "blake.smith@example.com", "maria.bennett@example.com", today - timedelta(days=7)],
+            ["Work Visa Renewal", "Casey Lee", "casey.lee@example.com", "maria.bennett@example.com", today - timedelta(days=2)],
+            ["Professional License Renewal", "Devon Patel", "devon.patel@example.com", "sarah.nguyen@example.com", today],
+            ["Passport Renewal", "Emerson Clark", "emerson.clark@example.com", "sarah.nguyen@example.com", today + timedelta(days=1)],
+            ["Commercial Driver License Renewal", "Finley Morgan", "finley.morgan@example.com", "sarah.nguyen@example.com", today + timedelta(days=2)],
+            ["Security Badge Expiration", "Gray Taylor", "gray.taylor@example.com", "james.carter@example.com", today + timedelta(days=3)],
+            ["Medical License Renewal", "Harper Davis", "harper.davis@example.com", "james.carter@example.com", today + timedelta(days=5)],
+            ["Passport Renewal", "Indigo Martinez", "indigo.martinez@example.com", "james.carter@example.com", today + timedelta(days=7)],
+            ["Work Permit Renewal", "Jordan Brown", "jordan.brown@example.com", "olivia.reed@example.com", today + timedelta(days=10)],
+            ["Driver License Renewal", "Kai Wilson", "kai.wilson@example.com", "olivia.reed@example.com", today + timedelta(days=14)],
+            ["Passport Renewal", "Logan Anderson", "logan.anderson@example.com", "olivia.reed@example.com", today + timedelta(days=18)],
+            ["Professional Certification Renewal", "Morgan Thomas", "morgan.thomas@example.com", "ethan.brooks@example.com", today + timedelta(days=21)],
+            ["Visa Document Review", "Noa White", "noa.white@example.com", "ethan.brooks@example.com", today + timedelta(days=25)],
+            ["Driver License Renewal", "Oakley Harris", "oakley.harris@example.com", "ethan.brooks@example.com", today + timedelta(days=30)],
+            ["Passport Renewal", "Parker Martin", "parker.martin@example.com", "nina.powers@example.com", today + timedelta(days=35)],
+            ["State License Renewal", "Quinn Thompson", "quinn.thompson@example.com", "nina.powers@example.com", today + timedelta(days=45)],
+            ["Work Visa Renewal", "Riley Garcia", "riley.garcia@example.com", "nina.powers@example.com", today + timedelta(days=60)],
+            ["Passport Renewal", "Sawyer Robinson", "sawyer.robinson@example.com", "marcus.hill@example.com", today + timedelta(days=75)],
+            ["Driver License Renewal", "Taylor Lewis", "taylor.lewis@example.com", "marcus.hill@example.com", today + timedelta(days=90)],
+            ["Professional License Renewal", "Uma Walker", "uma.walker@example.com", "marcus.hill@example.com", today + timedelta(days=120)],
+            ["Passport Renewal", "Val Jordan", "val.jordan@example.com", "rachel.kim@example.com", today + timedelta(days=150)],
+            ["Security Clearance Renewal", "Winter Hall", "winter.hall@example.com", "rachel.kim@example.com", today + timedelta(days=180)],
+            ["Driver License Renewal", "Xavier Young", "xavier.young@example.com", "rachel.kim@example.com", today + timedelta(days=240)],
+            ["Passport Renewal", "Yael Allen", "yael.allen@example.com", "rachel.kim@example.com", today + timedelta(days=365)],
         ]
 
         for row in rows:
@@ -382,7 +386,7 @@ class ExcelRepository:
             name=row["Name"],
             email=row["Email"],
             manager_email=row["Manager Email"],
-            passport_valid_until=normalize_date(row["Passport Expiry Date"]),
+            expiration_date=normalize_date(row["Expirary Date"]),
         )
 
     def _row_to_record(self, row: dict[str, Any]) -> RequestRecord:

@@ -60,7 +60,7 @@
     <article class="reminder-row">
       <div>
         <h2>{{ target.employee_name }} / {{ target.field_name }}</h2>
-        <p>{{ target.employee_id }} / {{ message.recipient }} / Expires {{ target.expiration_date.strftime('%Y-%m-%d') }}</p>
+        <p>To {{ message.recipient }} / From {{ message.sender or "signed-in Outlook account" }} / Expires {{ target.expiration_date.strftime('%Y-%m-%d') }}</p>
         <pre>{{ message.body }}</pre>
       </div>
       <form method="post">

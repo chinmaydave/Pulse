@@ -8,7 +8,7 @@ The current MVP uses a OneDrive Excel sharing link as the active data source. It
 - OneDrive Excel URL connection and refresh through the web interface
 - Dashboard for expiration counts, overdue records, and reminder queue
 - Manual and automatic expiration reminder preparation
-- Development email logging, with an optional Outlook sender path for Windows machines
+- Outlook reminder sending from Excel email addresses
 
 ## Run as an Internal Dev App
 
@@ -40,25 +40,7 @@ PULSE_WORKBOOK_PATH=/path/to/requests.xlsx python -m pulse_app
 
 ## Automatic Reminder Agent
 
-Pulse can run a background reminder agent inside the Flask process. The agent scans the Excel workbook, finds active requests due within the reminder window, sends reminders to associates, sends escalations to managers when a request is overdue with at least two prior reminders, and writes the reminder result back to Excel.
-
-Automatic sending is opt-in so local test runs do not accidentally send real mail:
-
-```bash
-PULSE_EMAIL_BACKEND=outlook \
-PULSE_AUTO_REMINDERS=true \
-PULSE_APP_BASE_URL=http://SERVER_INTERNAL_IP:5000 \
-python -m pulse_app
-```
-
-PowerShell:
-
-```powershell
-$env:PULSE_EMAIL_BACKEND="outlook"
-$env:PULSE_AUTO_REMINDERS="true"
-$env:PULSE_APP_BASE_URL="http://SERVER_INTERNAL_IP:5000"
-python -m pulse_app
-```
+Pulse runs a background reminder agent inside the Flask process. The agent scans the Excel workbook, finds records due within the reminder window, sends Outlook reminders, and writes reminder results back to Excel.
 
 Useful settings:
 
@@ -75,10 +57,9 @@ Keep the active workbook closed in Excel while the agent is running. Excel creat
 
 ## Email Sending
 
-Pulse defaults to Outlook sending. Users do not enter passwords or command-line email settings in Pulse.
+Pulse sends through Outlook using only the Excel workbook. There is no Email Settings tab, no password entry, and no command-line email setup.
 
 ```text
-Email -> Send test email
 Reminders -> Send
 ```
 
@@ -102,22 +83,12 @@ Expirary Date
 
 Pulse adds and maintains reminder/audit sheets in its active workbook copy. Use a OneDrive Excel sharing link that the app can access. Pulse tries normal share links, OneDrive shared-content download URLs, and embedded workbook download URLs. Fully private or sign-in-only OneDrive access should be handled later with Microsoft Graph authentication.
 
-## Outlook Sending
-
-By default reminders are logged to Excel instead of sent. On a Windows internal machine with Outlook installed, set either `PULSE_EMAIL_BACKEND=outlook` or the older compatibility flag:
-
-```bash
-PULSE_USE_OUTLOOK=true python -m pulse_app
-```
-
-The Outlook integration uses `pywin32`, which is only installed on Windows from `requirements.txt`.
-
 ## MVP Architecture
 
 - `pulse_app/excel_repository.py`: reads employee expiration rows and writes reminder/audit rows
 - `pulse_app/routes.py`: Flask web routes and form handling
 - `pulse_app/agents.py`: first manual reminder agent implementation
-- `pulse_app/email_service.py`: development logger and Outlook sender abstraction
+- `pulse_app/email_service.py`: Outlook sender abstraction
 - `pulse_app/onedrive_source.py`: downloads an accessible OneDrive Excel URL into the app
 - `scripts/create_mock_data.py`: rebuilds the local mock Excel workbook
 

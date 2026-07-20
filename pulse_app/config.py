@@ -11,31 +11,6 @@ def _env_bool(name: str, default: bool = False) -> bool:
 
 
 @dataclass(frozen=True)
-class SmtpSettings:
-    host: str = "localhost"
-    port: int = 1025
-    username: str = ""
-    password: str = ""
-    use_tls: bool = False
-    use_ssl: bool = False
-    from_address: str = "pulse@localhost"
-    timeout: int = 10
-
-    @classmethod
-    def from_env(cls) -> "SmtpSettings":
-        return cls(
-            host=os.getenv("PULSE_SMTP_HOST", "localhost"),
-            port=int(os.getenv("PULSE_SMTP_PORT", "1025")),
-            username=os.getenv("PULSE_SMTP_USER", ""),
-            password=os.getenv("PULSE_SMTP_PASSWORD", ""),
-            use_tls=_env_bool("PULSE_SMTP_USE_TLS", False),
-            use_ssl=_env_bool("PULSE_SMTP_USE_SSL", False),
-            from_address=os.getenv("PULSE_SMTP_FROM", "pulse@localhost"),
-            timeout=int(os.getenv("PULSE_SMTP_TIMEOUT", "10")),
-        )
-
-
-@dataclass(frozen=True)
 class OneDriveSettings:
     file_id: str = ""
     drive_id: str = ""
@@ -48,20 +23,6 @@ class OneDriveSettings:
         )
 
 
-def _resolve_backend() -> str:
-    """outlook (default) | dev | smtp.
-
-    PULSE_EMAIL_BACKEND wins if set. Otherwise PULSE_USE_OUTLOOK=true is honored
-    for backward compatibility with the original Outlook-only flag.
-    """
-    backend = os.getenv("PULSE_EMAIL_BACKEND", "").strip().lower()
-    if backend:
-        return backend
-    if _env_bool("PULSE_USE_OUTLOOK", True):
-        return "outlook"
-    return "outlook"
-
-
 @dataclass(frozen=True)
 class AppConfig:
     workbook_path: Path
@@ -69,7 +30,6 @@ class AppConfig:
     app_base_url: str = "http://127.0.0.1:5000"
     auto_reminders_enabled: bool = True
     email_backend: str = "outlook"
-    smtp: SmtpSettings = field(default_factory=SmtpSettings)
     data_backend: str = "excel"
     onedrive: OneDriveSettings = field(default_factory=OneDriveSettings)
     reminder_days_ahead: int = 3
@@ -94,8 +54,7 @@ class AppConfig:
             upload_dir=Path(os.getenv("PULSE_UPLOAD_DIR", BASE_DIR / "data" / "uploads")),
             app_base_url=os.getenv("PULSE_APP_BASE_URL", "http://127.0.0.1:5000"),
             auto_reminders_enabled=_env_bool("PULSE_AUTO_REMINDERS", True),
-            email_backend=_resolve_backend(),
-            smtp=SmtpSettings.from_env(),
+            email_backend="outlook",
             data_backend=os.getenv("PULSE_DATA_BACKEND", "excel").strip().lower(),
             onedrive=OneDriveSettings.from_env(),
             reminder_days_ahead=int(os.getenv("PULSE_REMINDER_DAYS_AHEAD", "3")),

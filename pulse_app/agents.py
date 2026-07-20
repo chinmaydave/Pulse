@@ -18,7 +18,6 @@ class ReminderAgent:
 
     def build_message(self, target: ExpirationTarget) -> ReminderMessage:
         escalate = target.is_overdue
-        recipient = target.manager_email if escalate and target.manager_email else target.email
         subject_prefix = "Escalation" if escalate else "Reminder"
         subject = f"{subject_prefix}: {target.field_name} expiring for {target.employee_name}"
         body = (
@@ -32,7 +31,7 @@ class ReminderAgent:
         )
         return ReminderMessage(
             target_key=target.target_key,
-            recipient=recipient,
+            recipient=target.email,
             subject=subject,
             body=body,
             sender=target.manager_email,

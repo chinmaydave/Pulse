@@ -6,14 +6,7 @@ from flask import Blueprint, current_app, flash, redirect, render_template, requ
 
 from .agents import ReminderAgent
 from .email_service import email_service
-from .email_settings import (
-    clear_email_settings,
-    display_email_settings,
-    effective_email_config,
-    save_email_settings,
-)
 from .excel_repository import ExcelRepository, EMPLOYEE_HEADERS
-from .models import ReminderMessage
 from .onedrive_source import download_onedrive_workbook
 
 
@@ -63,21 +56,8 @@ def automatic_agent():
     return current_app.pulse_automatic_agent
 
 
-def runtime_config():
-    return effective_email_config(config())
-
-
-def sync_runtime_email_settings() -> None:
-    cfg = runtime_config()
-    agent = automatic_agent()
-    agent.mailer = email_service(cfg)
-    agent.email_backend = cfg.email_backend
-    agent.use_outlook = cfg.use_outlook
-
-
 @bp.route("/")
 def dashboard():
-    sync_runtime_email_settings()
     records = repository().list_employees()
     return render_template(
         "dashboard.html",
@@ -174,8 +154,7 @@ def update_status(request_id: str):
 
 @bp.route("/reminders", methods=["GET", "POST"])
 def reminders():
-    sync_runtime_email_settings()
-    cfg = runtime_config()
+    cfg = config()
     mailer = email_service(cfg)
     agent = ReminderAgent(repository(), mailer, request.host_url.rstrip("/"))
     expiration_filter = request.values.get("expiration_filter", "all")
@@ -229,55 +208,6 @@ def reminders():
         expiration_filter=expiration_filter,
         filter_label=filter_label,
     )
-
-
-@bp.route("/email-settings", methods=["GET", "POST"])
-def email_settings():
-    if request.method == "POST":
-        action = request.form.get("action", "save")
-        if action == "clear":
-            clear_email_settings(config())
-            sync_runtime_email_settings()
-            flash("Email settings cleared. Pulse is back in development logging mode.", "success")
-            return redirect(url_for("pulse.email_settings"))
-
-        if action == "test":
-            cfg = runtime_config()
-            recipient = request.form.get("test_recipient", "").strip() or cfg.smtp.from_address
-            sender = request.form.get("test_sender", "").strip()
-            result = email_service(cfg).send(
-                ReminderMessage(
-                    target_key="email-settings-test",
-                    recipient=recipient,
-                    subject="Pulse email test",
-                    body="Pulse test email sent from the Email Settings page.",
-                    sender=sender,
-                )
-            )
-            category = "success" if result.status == "sent" else "error"
-            flash(f"Test email {result.status} to {recipient}. {result.detail}", category)
-            return redirect(url_for("pulse.email_settings"))
-
-        password = request.form.get("password", "")
-        existing = display_email_settings(config())
-        form_data = request.form.to_dict()
-        if not password and existing.get("password_saved"):
-            form_data["password"] = load_saved_password()
-        save_email_settings(config(), form_data)
-        sync_runtime_email_settings()
-        flash("Email settings saved. Reminder sends will use these SMTP settings now.", "success")
-        return redirect(url_for("pulse.email_settings"))
-
-    settings = display_email_settings(config())
-    return render_template(
-        "email_settings.html",
-        settings=settings,
-        active_backend=runtime_config().email_backend,
-    )
-
-
-def load_saved_password() -> str:
-    return effective_email_config(config()).smtp.password
 
 
 @bp.route("/reports")

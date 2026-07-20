@@ -35,6 +35,19 @@ class SmtpSettings:
         )
 
 
+@dataclass(frozen=True)
+class OneDriveSettings:
+    file_id: str = ""
+    drive_id: str = ""
+
+    @classmethod
+    def from_env(cls) -> "OneDriveSettings":
+        return cls(
+            file_id=os.getenv("PULSE_ONEDRIVE_FILE_ID", ""),
+            drive_id=os.getenv("PULSE_ONEDRIVE_DRIVE_ID", ""),
+        )
+
+
 def _resolve_backend() -> str:
     """dev (default) | smtp | outlook.
 
@@ -55,6 +68,8 @@ class AppConfig:
     upload_dir: Path = BASE_DIR / "data" / "uploads"
     email_backend: str = "dev"
     smtp: SmtpSettings = field(default_factory=SmtpSettings)
+    data_backend: str = "excel"
+    onedrive: OneDriveSettings = field(default_factory=OneDriveSettings)
     reminder_days_ahead: int = 3
     host: str = "0.0.0.0"
     port: int = 5000
@@ -74,6 +89,8 @@ class AppConfig:
             upload_dir=Path(os.getenv("PULSE_UPLOAD_DIR", BASE_DIR / "data" / "uploads")),
             email_backend=_resolve_backend(),
             smtp=SmtpSettings.from_env(),
+            data_backend=os.getenv("PULSE_DATA_BACKEND", "excel").strip().lower(),
+            onedrive=OneDriveSettings.from_env(),
             reminder_days_ahead=int(os.getenv("PULSE_REMINDER_DAYS_AHEAD", "3")),
             host=os.getenv("PULSE_HOST", "0.0.0.0"),
             port=int(os.getenv("PULSE_PORT", "5000")),

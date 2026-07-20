@@ -1,3 +1,4 @@
 Flask>=3.0,<4.0
 openpyxl>=3.1,<4.0
 pywin32>=306; platform_system == "Windows"
+# Part 1a will add: msal>=1.29 or azure-identity + msgraph-core

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Data Source{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <p class="eyebrow">Excel repository</p>
+    <h1>Data source</h1>
+  </div>
+</section>
+
+<section class="form-band single">
+  <form method="post" class="response-form">
+    <input type="hidden" name="action" value="connect">
+    <h2>Connect OneDrive workbook</h2>
+    <p class="muted">Paste a OneDrive Excel sharing link. Pulse downloads the workbook, validates it, and uses the expiration dates for reminder emails.</p>
+    <label>
+      OneDrive Excel URL
+      <input type="url" name="onedrive_url" placeholder="https://1drv.ms/x/..." required>
+    </label>
+    <button type="submit">Use OneDrive workbook</button>
+  </form>
+
+  <div class="panel">
+    <h2>Current workbook</h2>
+    <pre>{{ workbook_path }}</pre>
+    <h2>Saved OneDrive source</h2>
+    {% if onedrive_source_url %}
+      <pre>{{ onedrive_source_url }}</pre>
+      <form method="post" class="inline-form">
+        <input type="hidden" name="action" value="refresh-onedrive">
+        <button type="submit">Refresh from OneDrive</button>
+      </form>
+    {% else %}
+      <p class="muted">No OneDrive source is connected yet.</p>
+    {% endif %}
+    <h2>Required expiration columns</h2>
+    <p class="muted">{{ required_headers }}</p>
+  </div>
+</section>
+{% endblock %}

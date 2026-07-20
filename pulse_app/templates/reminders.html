@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Reminders{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <p class="eyebrow">Agent queue</p>
+    <h1>Reminders</h1>
+  </div>
+  <div class="button-row">
+    <form method="post">
+      <input type="hidden" name="target_key" value="automatic-once">
+      <input type="hidden" name="expiration_filter" value="{{ expiration_filter }}">
+      <button type="submit">Run agent now</button>
+    </form>
+    <form method="post">
+      <input type="hidden" name="target_key" value="all">
+      <input type="hidden" name="expiration_filter" value="{{ expiration_filter }}">
+      <button type="submit">Send all due</button>
+    </form>
+  </div>
+</section>
+
+<section class="agent-strip">
+  <div>
+    <span class="agent-label">Automatic agent</span>
+    <strong>{{ "Running" if agent_snapshot.running else ("Enabled" if agent_snapshot.enabled else "Disabled") }}</strong>
+  </div>
+  <div>
+    <span class="agent-label">Email channel</span>
+    <strong>{{ agent_snapshot.email_backend }}</strong>
+  </div>
+  <div>
+    <span class="agent-label">Eligible now</span>
+    <strong>{{ automatic_due|length }}</strong>
+  </div>
+  <div>
+    <span class="agent-label">Last result</span>
+    <strong>{{ agent_snapshot.last_result }}</strong>
+  </div>
+</section>
+
+<section class="filter-strip">
+  <form method="get">
+    <label for="expiration_filter">Expiration filter:</label>
+    <select id="expiration_filter" name="expiration_filter" onchange="this.form.submit()">
+      <option value="all" {% if expiration_filter == "all" %}selected{% endif %}>All expiring records</option>
+      <option value="overdue" {% if expiration_filter == "overdue" %}selected{% endif %}>Overdue</option>
+      <option value="30" {% if expiration_filter == "30" %}selected{% endif %}>Expires in 30 days or less</option>
+      <option value="14" {% if expiration_filter == "14" %}selected{% endif %}>Expires in 14 days or less</option>
+      <option value="7" {% if expiration_filter == "7" %}selected{% endif %}>Expires in 7 days or less</option>
+    </select>
+  </form>
+  <p class="muted">Showing {{ filter_label }}.</p>
+</section>
+
+<p class="muted">The automatic agent only sends records outside the {{ cooldown_hours }} hour reminder cooldown.</p>
+
+{% if gmail_sender_statuses %}
+  <section class="panel credential-panel">
+    <h2>Gmail senders</h2>
+    <p class="muted">Gmail manager senders need a valid Gmail app password before Pulse can send from them.</p>
+    {% for sender in gmail_sender_statuses %}
+      <form method="post" class="inline-form">
+        <input type="hidden" name="action" value="save-gmail-sender">
+        <input type="hidden" name="expiration_filter" value="{{ expiration_filter }}">
+        <input type="hidden" name="gmail_sender" value="{{ sender.email }}">
+        <label>
+          {{ sender.email }} — {{ "saved" if sender.saved else "not saved" }}
+          <input type="password" name="gmail_app_password" placeholder="{{ 'New Gmail app password' if sender.saved else 'Gmail app password' }}" required>
+        </label>
+        <button type="submit">{{ "Update Gmail sender" if sender.saved else "Save Gmail sender" }}</button>
+      </form>
+      {% if sender.saved %}
+        <form method="post" class="inline-form">
+          <input type="hidden" name="action" value="clear-gmail-sender">
+          <input type="hidden" name="expiration_filter" value="{{ expiration_filter }}">
+          <input type="hidden" name="gmail_sender" value="{{ sender.email }}">
+          <button type="submit">Clear saved password</button>
+        </form>
+      {% endif %}
+    {% endfor %}
+  </section>
+{% endif %}
+
+<section class="reminder-list">
+  {% for target, message in messages %}
+    <article class="reminder-row">
+      <div>
+        <h2>{{ target.employee_name }} / {{ target.field_name }}</h2>
+        <p>To {{ message.recipient }} / From {{ message.sender or "signed-in Outlook account" }} / Expires {{ target.expiration_date.strftime('%Y-%m-%d') }}</p>
+        <pre>{{ message.body }}</pre>
+      </div>
+      <form method="post">
+        <input type="hidden" name="target_key" value="{{ target.target_key }}">
+        <button type="submit">{{ "Escalate" if message.escalate else "Send" }}</button>
+      </form>
+    </article>
+  {% else %}
+    <div class="empty">No reminder messages are ready.</div>
+  {% endfor %}
+</section>
+{% endblock %}

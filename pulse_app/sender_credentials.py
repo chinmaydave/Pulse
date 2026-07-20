@@ -24,12 +24,16 @@ def load_sender_credentials(config: AppConfig) -> dict[str, str]:
         data = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError:
         return {}
-    return {str(key).lower(): str(value) for key, value in data.items()}
+    return {str(key).lower(): clean_app_password(str(value)) for key, value in data.items()}
+
+
+def clean_app_password(app_password: str) -> str:
+    return "".join(app_password.split())
 
 
 def save_gmail_app_password(config: AppConfig, sender: str, app_password: str) -> None:
     sender = sender.strip().lower()
-    app_password = app_password.strip().replace(" ", "")
+    app_password = clean_app_password(app_password)
     if not sender or not is_gmail_address(sender) or not app_password:
         raise ValueError("Enter a Gmail sender address and app password.")
 
@@ -37,6 +41,14 @@ def save_gmail_app_password(config: AppConfig, sender: str, app_password: str) -
     credentials = load_sender_credentials(config)
     credentials[sender] = app_password
     credential_path(config).write_text(json.dumps(credentials, indent=2), encoding="utf-8")
+
+
+def clear_gmail_app_password(config: AppConfig, sender: str) -> None:
+    sender = sender.strip().lower()
+    credentials = load_sender_credentials(config)
+    if sender in credentials:
+        del credentials[sender]
+        credential_path(config).write_text(json.dumps(credentials, indent=2), encoding="utf-8")
 
 
 def gmail_senders_missing_credentials(config: AppConfig, targets: list[ExpirationTarget]) -> list[str]:
@@ -47,3 +59,19 @@ def gmail_senders_missing_credentials(config: AppConfig, targets: list[Expiratio
         if target.manager_email and is_gmail_address(target.manager_email)
     }
     return sorted(sender for sender in senders if sender not in credentials)
+
+
+def gmail_sender_statuses(config: AppConfig, targets: list[ExpirationTarget]) -> list[dict[str, object]]:
+    credentials = load_sender_credentials(config)
+    senders = {
+        target.manager_email.strip().lower()
+        for target in targets
+        if target.manager_email and is_gmail_address(target.manager_email)
+    }
+    return [
+        {
+            "email": sender,
+            "saved": sender in credentials,
+        }
+        for sender in sorted(senders)
+    ]

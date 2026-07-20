@@ -55,21 +55,29 @@
 
 <p class="muted">The automatic agent only sends records outside the {{ cooldown_hours }} hour reminder cooldown.</p>
 
-{% if missing_gmail_senders %}
+{% if gmail_sender_statuses %}
   <section class="panel credential-panel">
     <h2>Gmail senders</h2>
-    <p class="muted">Gmail manager senders need a Gmail app password saved once before Pulse can send from them.</p>
-    {% for sender in missing_gmail_senders %}
+    <p class="muted">Gmail manager senders need a valid Gmail app password before Pulse can send from them.</p>
+    {% for sender in gmail_sender_statuses %}
       <form method="post" class="inline-form">
         <input type="hidden" name="action" value="save-gmail-sender">
         <input type="hidden" name="expiration_filter" value="{{ expiration_filter }}">
-        <input type="hidden" name="gmail_sender" value="{{ sender }}">
+        <input type="hidden" name="gmail_sender" value="{{ sender.email }}">
         <label>
-          {{ sender }}
-          <input type="password" name="gmail_app_password" placeholder="Gmail app password" required>
+          {{ sender.email }} — {{ "saved" if sender.saved else "not saved" }}
+          <input type="password" name="gmail_app_password" placeholder="{{ 'New Gmail app password' if sender.saved else 'Gmail app password' }}" required>
         </label>
-        <button type="submit">Save Gmail sender</button>
+        <button type="submit">{{ "Update Gmail sender" if sender.saved else "Save Gmail sender" }}</button>
       </form>
+      {% if sender.saved %}
+        <form method="post" class="inline-form">
+          <input type="hidden" name="action" value="clear-gmail-sender">
+          <input type="hidden" name="expiration_filter" value="{{ expiration_filter }}">
+          <input type="hidden" name="gmail_sender" value="{{ sender.email }}">
+          <button type="submit">Clear saved password</button>
+        </form>
+      {% endif %}
     {% endfor %}
   </section>
 {% endif %}

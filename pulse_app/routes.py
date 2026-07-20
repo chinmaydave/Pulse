@@ -9,6 +9,7 @@ from werkzeug.utils import secure_filename
 from .agents import ReminderAgent
 from .email_service import email_service
 from .excel_repository import ExcelRepository, EMPLOYEE_HEADERS
+from .onedrive_source import download_onedrive_workbook
 
 
 bp = Blueprint("pulse", __name__)
@@ -34,7 +35,7 @@ def automatic_agent():
 
 @bp.route("/")
 def dashboard():
-    records = repository().list_requests()
+    records = repository().list_employees()
     return render_template(
         "dashboard.html",
         summary=repository().summary(),
@@ -49,9 +50,25 @@ def dashboard():
 def data_source():
     cfg = config()
     if request.method == "POST":
+        source_url = request.form.get("onedrive_url", "").strip()
+        if source_url:
+            cfg.upload_dir.mkdir(parents=True, exist_ok=True)
+            uploaded_path = cfg.upload_dir / "onedrive_passport_expirations.xlsx"
+            try:
+                download_onedrive_workbook(source_url, uploaded_path)
+                ExcelRepository.validate_workbook(uploaded_path)
+                set_repository(uploaded_path)
+            except Exception as exc:
+                uploaded_path.unlink(missing_ok=True)
+                flash(str(exc), "error")
+                return redirect(url_for("pulse.data_source"))
+
+            flash("OneDrive workbook connected and activated.", "success")
+            return redirect(url_for("pulse.dashboard"))
+
         upload = request.files.get("workbook")
         if not upload or not upload.filename:
-            flash("Choose an Excel workbook to upload.", "error")
+            flash("Choose an Excel workbook to upload or paste a OneDrive Excel URL.", "error")
             return redirect(url_for("pulse.data_source"))
         if not upload.filename.lower().endswith(".xlsx"):
             flash("Upload a .xlsx workbook.", "error")

@@ -1,15 +1,14 @@
 # Pulse
 
-Internal Python development app for managing associate information update requests from an Excel workbook.
+Internal Python development app for managing passport expiry reminders from an Excel workbook.
 
-The current MVP intentionally uses a local mock workbook instead of SharePoint. It provides:
+The current MVP can use a local workbook upload or a OneDrive Excel URL. It provides:
 
-- Excel-backed request storage with `Requests`, `AuditLog`, and `ReminderLog` sheets
-- Workbook upload through the web interface
-- Dashboard for request counts, overdue work, and reminder queue
-- Associate request forms that write submitted values back to Excel
-- Manager status updates
-- Manual reminder and escalation preparation
+- Excel-backed passport expiry tracking with `Employees`, `AuditLog`, `ReminderLog`, and `ReminderRequests` sheets
+- OneDrive Excel URL import through the web interface
+- Local workbook upload for testing
+- Dashboard for passport expiry counts, overdue records, and reminder queue
+- Manual and automatic passport expiry reminder preparation
 - Development email logging, with an optional Outlook sender path for Windows machines
 
 ## Run as an Internal Dev App
@@ -34,7 +33,7 @@ On the server itself, this also works:
 http://127.0.0.1:5000
 ```
 
-The workbook is created at `data/pulse_requests_mock.xlsx`. To use another workbook path:
+The workbook is created at `data/pulse_passport_expirations_mock.xlsx`. To use another workbook path:
 
 ```bash
 PULSE_WORKBOOK_PATH=/path/to/requests.xlsx python -m pulse_app
@@ -94,13 +93,24 @@ python -m pulse_app
 
 Use `PULSE_EMAIL_BACKEND=dev` for UI testing without sending real email.
 
-You can also upload a workbook from the web UI:
+You can also connect a OneDrive workbook or upload a workbook from the web UI:
 
 ```text
-Data Source -> Upload workbook
+Data Source -> Use OneDrive workbook
+Data Source -> Upload workbook instead
 ```
 
-Uploaded workbooks must be `.xlsx` files with a `Requests` sheet and the required request columns. If `AuditLog` or `ReminderLog` sheets are missing, the app creates them.
+Workbooks must be `.xlsx` files with an `Employees` sheet and these five columns:
+
+```text
+Title
+Name
+Email
+Manager Email
+Passport Expiry Date
+```
+
+Pulse adds and maintains reminder/audit sheets. OneDrive URLs must be accessible to the app as downloadable Excel files. Fully private OneDrive access should be handled later with Microsoft Graph authentication.
 
 ## Outlook Sending
 
@@ -114,10 +124,11 @@ The Outlook integration uses `pywin32`, which is only installed on Windows from 
 
 ## MVP Architecture
 
-- `pulse_app/excel_repository.py`: reads and writes workbook rows
+- `pulse_app/excel_repository.py`: reads employee passport expiry rows and writes reminder/audit rows
 - `pulse_app/routes.py`: Flask web routes and form handling
 - `pulse_app/agents.py`: first manual reminder agent implementation
 - `pulse_app/email_service.py`: development logger and Outlook sender abstraction
+- `pulse_app/onedrive_source.py`: downloads an accessible OneDrive Excel URL into the app
 - `scripts/create_mock_data.py`: rebuilds the local mock Excel workbook
 
 Future SharePoint, Teams, and autonomous agent work can plug into these boundaries without changing the user-facing workflow.

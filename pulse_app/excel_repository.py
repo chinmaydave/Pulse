@@ -6,6 +6,7 @@ from threading import Lock
 from typing import Any
 
 from openpyxl import Workbook, load_workbook
+from openpyxl.utils.datetime import from_excel
 
 from .models import (
     ACTIVE_STATUSES,
@@ -42,13 +43,11 @@ REQUEST_HEADERS = [
 ]
 
 EMPLOYEE_HEADERS = [
-    "Employee ID",
+    "Title",
     "Name",
     "Email",
-    "Citizenship Status",
-    "Passport Valid Until",
-    "Driver License Valid Until",
-    "Visa Valid Until",
+    "Manager Email",
+    "Passport Expiry Date",
 ]
 
 AUDIT_HEADERS = ["timestamp", "record_id", "actor", "action", "details"]
@@ -127,31 +126,25 @@ class ExcelRepository:
         today = date.today()
         rows = [
             [
-                "E-1001",
+                "Passport Renewal",
                 "Avery Johnson",
                 "avery.johnson@example.com",
-                "Citizen",
+                "manager.hr@example.com",
                 today + timedelta(days=30),
-                today + timedelta(days=90),
-                today + timedelta(days=120),
             ],
             [
-                "E-1002",
+                "Passport Renewal",
                 "Blake Smith",
                 "blake.smith@example.com",
-                "Permanent Resident",
+                "manager.hr@example.com",
                 today - timedelta(days=1),
-                today + timedelta(days=60),
-                today + timedelta(days=10),
             ],
             [
-                "E-1003",
+                "Passport Renewal",
                 "Casey Lee",
                 "casey.lee@example.com",
-                "Work Visa",
+                "manager.hr@example.com",
                 today + timedelta(days=365),
-                today + timedelta(days=180),
-                today - timedelta(days=5),
             ],
         ]
 
@@ -367,18 +360,29 @@ class ExcelRepository:
 
     def _row_to_employee(self, row: dict[str, Any]) -> EmployeeRecord:
         def normalize_date(value: Any) -> date | None:
+            if value in (None, ""):
+                return None
             if isinstance(value, datetime):
                 return value.date()
+            if isinstance(value, date):
+                return value
+            if isinstance(value, (int, float)):
+                return from_excel(value).date()
+            if isinstance(value, str):
+                for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y"):
+                    try:
+                        return datetime.strptime(value.strip(), fmt).date()
+                    except ValueError:
+                        pass
+                raise ValueError(f"Unsupported date format: {value}")
             return value
 
         return EmployeeRecord(
-            employee_id=row["Employee ID"],
+            title=row["Title"],
             name=row["Name"],
             email=row["Email"],
-            citizenship_status=row["Citizenship Status"],
-            passport_valid_until=normalize_date(row["Passport Valid Until"]),
-            driver_license_valid_until=normalize_date(row["Driver License Valid Until"]),
-            visa_valid_until=normalize_date(row["Visa Valid Until"]),
+            manager_email=row["Manager Email"],
+            passport_valid_until=normalize_date(row["Passport Expiry Date"]),
         )
 
     def _row_to_record(self, row: dict[str, Any]) -> RequestRecord:

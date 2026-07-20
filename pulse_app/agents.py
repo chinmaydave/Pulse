@@ -18,17 +18,17 @@ class ReminderAgent:
 
     def build_message(self, target: ExpirationTarget) -> ReminderMessage:
         escalate = target.is_overdue
-        recipient = target.email
+        recipient = target.manager_email if escalate and target.manager_email else target.email
         subject_prefix = "Escalation" if escalate else "Reminder"
         subject = f"{subject_prefix}: {target.field_name} expiring for {target.employee_name}"
         body = (
             f"Employee: {target.employee_name}\n"
-            f"Employee ID: {target.employee_id}\n"
+            f"Title: {target.employee_id}\n"
             f"Field: {target.field_name}\n"
             f"Expiration date: {target.expiration_date:%Y-%m-%d}\n"
             f"Days until due: {target.days_until_due}\n"
             f"Status: {self._status_text(target)}\n\n"
-            f"Please review the expiring document and take action accordingly."
+            f"Please review the passport expiration and take action accordingly."
         )
         return ReminderMessage(
             target_key=target.target_key,

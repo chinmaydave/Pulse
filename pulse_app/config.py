@@ -72,7 +72,7 @@ class AppConfig:
     @classmethod
     def from_env(cls) -> "AppConfig":
         workbook_path = Path(
-            os.getenv("PULSE_WORKBOOK_PATH", BASE_DIR / "data" / "pulse_requests_mock.xlsx")
+            os.getenv("PULSE_WORKBOOK_PATH", BASE_DIR / "data" / "pulse_passport_expirations_mock.xlsx")
         )
         return cls(
             workbook_path=workbook_path,

@@ -8,12 +8,12 @@
   </div>
   <div class="button-row">
     <form method="post">
-      <input type="hidden" name="request_id" value="automatic-once">
+      <input type="hidden" name="target_key" value="automatic-once">
       <input type="hidden" name="expiration_filter" value="{{ expiration_filter }}">
       <button type="submit">Run agent now</button>
     </form>
     <form method="post">
-      <input type="hidden" name="request_id" value="all">
+      <input type="hidden" name="target_key" value="all">
       <input type="hidden" name="expiration_filter" value="{{ expiration_filter }}">
       <button type="submit">Send all due</button>
     </form>

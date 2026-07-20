@@ -50,19 +50,19 @@ class RequestRecord:
 
 @dataclass(frozen=True)
 class EmployeeRecord:
-    employee_id: str
+    title: str
     name: str
     email: str
-    citizenship_status: str
+    manager_email: str
     passport_valid_until: date | None
-    driver_license_valid_until: date | None
-    visa_valid_until: date | None
+
+    @property
+    def employee_id(self) -> str:
+        return self.title
 
     def expiration_fields(self) -> list[tuple[str, date | None]]:
         return [
-            ("Passport Valid Until", self.passport_valid_until),
-            ("Driver License Valid Until", self.driver_license_valid_until),
-            ("Visa Valid Until", self.visa_valid_until),
+            ("Passport Expiry Date", self.passport_valid_until),
         ]
 
     def expiration_targets(self) -> list["ExpirationTarget"]:
@@ -78,6 +78,7 @@ class EmployeeRecord:
                     employee_id=self.employee_id,
                     employee_name=self.name,
                     email=self.email,
+                    manager_email=self.manager_email,
                     field_name=field_name,
                     expiration_date=expiration_date,
                     days_until_due=days_until_due,
@@ -92,6 +93,7 @@ class ExpirationTarget:
     employee_id: str
     employee_name: str
     email: str
+    manager_email: str
     field_name: str
     expiration_date: date
     days_until_due: int

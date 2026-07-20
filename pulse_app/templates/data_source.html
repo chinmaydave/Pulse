@@ -9,12 +9,22 @@
 </section>
 
 <section class="form-band single">
+  <form method="post" class="response-form">
+    <h2>Use OneDrive workbook</h2>
+    <p class="muted">Paste a OneDrive Excel sharing or download URL. Pulse downloads the workbook, validates it, and uses passport expiry dates for reminder emails.</p>
+    <label>
+      OneDrive Excel URL
+      <input type="url" name="onedrive_url" placeholder="https://.../PassportExpirations.xlsx">
+    </label>
+    <button type="submit">Use OneDrive workbook</button>
+  </form>
+
   <form method="post" enctype="multipart/form-data" class="response-form">
-    <h2>Upload workbook</h2>
-    <p class="muted">The uploaded file becomes the active Excel repository for requests, statuses, reminders, and audit tracking.</p>
+    <h2>Upload workbook instead</h2>
+    <p class="muted">Use this for local testing with the same workbook format.</p>
     <label>
       Excel workbook
-      <input type="file" name="workbook" accept=".xlsx" required>
+      <input type="file" name="workbook" accept=".xlsx">
     </label>
     <button type="submit">Upload and use workbook</button>
   </form>
@@ -22,7 +32,7 @@
   <div class="panel">
     <h2>Current workbook</h2>
     <pre>{{ workbook_path }}</pre>
-    <h2>Required Requests columns</h2>
+    <h2>Required passport expiry columns</h2>
     <p class="muted">{{ required_headers }}</p>
   </div>
 </section>

@@ -66,13 +66,18 @@ def _resolve_backend() -> str:
 class AppConfig:
     workbook_path: Path
     upload_dir: Path = BASE_DIR / "data" / "uploads"
+    app_base_url: str = "http://127.0.0.1:5000"
+    auto_reminders_enabled: bool = False
     email_backend: str = "dev"
     smtp: SmtpSettings = field(default_factory=SmtpSettings)
     data_backend: str = "excel"
     onedrive: OneDriveSettings = field(default_factory=OneDriveSettings)
     reminder_days_ahead: int = 3
+    reminder_scan_interval_seconds: int = 300
+    reminder_cooldown_hours: int = 24
     host: str = "0.0.0.0"
     port: int = 5000
+    debug: bool = False
 
     @property
     def use_outlook(self) -> bool:
@@ -82,16 +87,21 @@ class AppConfig:
     @classmethod
     def from_env(cls) -> "AppConfig":
         workbook_path = Path(
-            os.getenv("PULSE_WORKBOOK_PATH", BASE_DIR / "data" / "pulse_requests_mock.xlsx")
+            os.getenv("PULSE_WORKBOOK_PATH", BASE_DIR / "data" / "pulse_passport_expirations_mock.xlsx")
         )
         return cls(
             workbook_path=workbook_path,
             upload_dir=Path(os.getenv("PULSE_UPLOAD_DIR", BASE_DIR / "data" / "uploads")),
+            app_base_url=os.getenv("PULSE_APP_BASE_URL", "http://127.0.0.1:5000"),
+            auto_reminders_enabled=os.getenv("PULSE_AUTO_REMINDERS", "false").lower() == "true",
             email_backend=_resolve_backend(),
             smtp=SmtpSettings.from_env(),
             data_backend=os.getenv("PULSE_DATA_BACKEND", "excel").strip().lower(),
             onedrive=OneDriveSettings.from_env(),
             reminder_days_ahead=int(os.getenv("PULSE_REMINDER_DAYS_AHEAD", "3")),
+            reminder_scan_interval_seconds=int(os.getenv("PULSE_REMINDER_SCAN_INTERVAL_SECONDS", "300")),
+            reminder_cooldown_hours=int(os.getenv("PULSE_REMINDER_COOLDOWN_HOURS", "24")),
             host=os.getenv("PULSE_HOST", "0.0.0.0"),
             port=int(os.getenv("PULSE_PORT", "5000")),
+            debug=os.getenv("PULSE_DEBUG", "false").lower() == "true",
         )

@@ -49,8 +49,68 @@ class RequestRecord:
 
 
 @dataclass(frozen=True)
+class EmployeeRecord:
+    title: str
+    name: str
+    email: str
+    manager_email: str
+    passport_valid_until: date | None
+
+    @property
+    def employee_id(self) -> str:
+        return self.title
+
+    def expiration_fields(self) -> list[tuple[str, date | None]]:
+        return [
+            ("Passport Expiry Date", self.passport_valid_until),
+        ]
+
+    def expiration_targets(self) -> list["ExpirationTarget"]:
+        today = date.today()
+        targets: list[ExpirationTarget] = []
+        for field_name, expiration_date in self.expiration_fields():
+            if expiration_date is None:
+                continue
+            days_until_due = (expiration_date - today).days
+            status = "overdue" if expiration_date < today else "due_soon" if days_until_due <= 0 else "upcoming"
+            targets.append(
+                ExpirationTarget(
+                    employee_id=self.employee_id,
+                    employee_name=self.name,
+                    email=self.email,
+                    manager_email=self.manager_email,
+                    field_name=field_name,
+                    expiration_date=expiration_date,
+                    days_until_due=days_until_due,
+                    status=status,
+                )
+            )
+        return targets
+
+
+@dataclass(frozen=True)
+class ExpirationTarget:
+    employee_id: str
+    employee_name: str
+    email: str
+    manager_email: str
+    field_name: str
+    expiration_date: date
+    days_until_due: int
+    status: str
+
+    @property
+    def is_overdue(self) -> bool:
+        return self.expiration_date < date.today()
+
+    @property
+    def target_key(self) -> str:
+        return f"{self.employee_id}|{self.field_name}"
+
+
+@dataclass(frozen=True)
 class ReminderMessage:
-    request_id: str
+    target_key: str
     recipient: str
     subject: str
     body: str

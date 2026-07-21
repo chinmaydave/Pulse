@@ -68,6 +68,24 @@ a:hover {
   text-decoration: none;
 }
 
+.logout-form {
+  display: inline;
+}
+
+.linklike {
+  background: none;
+  border: none;
+  color: #e8edf5;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.linklike:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .shell {
   width: min(1280px, calc(100% - 32px));
   margin: 28px auto 56px;

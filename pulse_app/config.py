@@ -63,6 +63,8 @@ class AppConfig:
     host: str = "0.0.0.0"
     port: int = 5000
     debug: bool = False
+    auth_username: str = "admin"
+    auth_password: str = "pulse-admin"
 
     @property
     def use_outlook(self) -> bool:
@@ -87,4 +89,6 @@ class AppConfig:
             host=os.getenv("PULSE_HOST", "0.0.0.0"),
             port=int(os.getenv("PULSE_PORT", "5000")),
             debug=os.getenv("PULSE_DEBUG", "false").lower() == "true",
+            auth_username=os.getenv("PULSE_AUTH_USERNAME", "admin"),
+            auth_password=os.getenv("PULSE_AUTH_PASSWORD", "pulse-admin"),
         )

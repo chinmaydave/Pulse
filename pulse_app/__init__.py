@@ -9,8 +9,9 @@ from .email_service import email_service
 
 
 def create_app(config: AppConfig | None = None):
-    from flask import Flask
+    from flask import Flask, redirect, request, url_for
 
+    from .auth import bp as auth_bp, is_authenticated
     from .excel_repository import ExcelRepository
     from .routes import bp
 
@@ -26,7 +27,17 @@ def create_app(config: AppConfig | None = None):
         app.pulse_automatic_agent.start()
         atexit.register(app.pulse_automatic_agent.stop)
 
+    app.register_blueprint(auth_bp)
     app.register_blueprint(bp)
+
+    @app.before_request
+    def _require_login():
+        if request.endpoint == "static" or (request.endpoint or "").startswith("auth."):
+            return None
+        if not is_authenticated():
+            return redirect(url_for("auth.login", next=request.path))
+        return None
+
     return app
 
 

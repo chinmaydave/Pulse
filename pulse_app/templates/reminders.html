@@ -15,7 +15,7 @@
     <form method="post">
       <input type="hidden" name="target_key" value="all">
       <input type="hidden" name="expiration_filter" value="{{ expiration_filter }}">
-      <button type="submit">Send all due</button>
+      <button type="submit">Send all unsent</button>
     </form>
   </div>
 </section>
@@ -83,16 +83,19 @@
 {% endif %}
 
 <section class="reminder-list">
-  {% for target, message in messages %}
-    <article class="reminder-row">
+  {% for target, message, last_sent in messages %}
+    <article class="reminder-row {{ 'sent-reminder' if last_sent else '' }}">
       <div>
         <h2>{{ target.employee_name }} / {{ target.field_name }}</h2>
         <p>To {{ message.recipient }} / From {{ message.sender or "signed-in Outlook account" }} / Expires {{ target.expiration_date.strftime('%Y-%m-%d') }}</p>
         <pre>{{ message.body }}</pre>
+        {% if last_sent %}
+          <p class="sent-note">Last sent {{ last_sent.timestamp }} through {{ last_sent.channel }}. Pulse will skip this reminder to avoid duplicate emails.</p>
+        {% endif %}
       </div>
       <form method="post">
         <input type="hidden" name="target_key" value="{{ target.target_key }}">
-        <button type="submit">{{ "Escalate" if message.escalate else "Send" }}</button>
+        <button type="submit" {% if last_sent %}disabled{% endif %}>{{ "Already sent" if last_sent else ("Escalate" if message.escalate else "Send") }}</button>
       </form>
     </article>
   {% else %}

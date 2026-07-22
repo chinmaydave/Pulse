@@ -215,21 +215,35 @@ class ExcelRepository:
         return None
 
     def last_reminder_for_target(self, target_key: str) -> datetime | None:
+        row = self.latest_reminder_for_target(target_key)
+        return row.get("timestamp") if row else None
+
+    def latest_reminder_for_target(
+        self,
+        target_key: str,
+        expiration_date: date | None = None,
+        status: str | None = None,
+    ) -> dict[str, Any] | None:
         with self._lock:
             workbook = load_workbook(self.workbook_path)
             if "ReminderLog" not in workbook.sheetnames:
                 return None
             sheet = workbook["ReminderLog"]
-            headers = [cell.value for cell in sheet[1]]
             rows = self._iter_rows(sheet)
-            timestamps = [
-                row["timestamp"]
+            matches = [
+                row
                 for row in rows
-                if row.get("target_key") == target_key and row.get("timestamp") is not None
+                if row.get("target_key") == target_key
+                and row.get("timestamp") is not None
+                and (status is None or row.get("status") == status)
+                and (expiration_date is None or self._normalize_date(row.get("expiration_date")) == expiration_date)
             ]
-            if not timestamps:
+            if not matches:
                 return None
-            return max(timestamps)
+            return max(matches, key=lambda row: row["timestamp"])
+
+    def last_sent_for_target(self, target: ExpirationTarget) -> dict[str, Any] | None:
+        return self.latest_reminder_for_target(target.target_key, target.expiration_date, "sent")
 
     def submit_response(self, request_id: str, submitted_value: str, notes: str, actor: str) -> None:
         with self._lock:
@@ -363,30 +377,12 @@ class ExcelRepository:
         ]
 
     def _row_to_employee(self, row: dict[str, Any]) -> EmployeeRecord:
-        def normalize_date(value: Any) -> date | None:
-            if value in (None, ""):
-                return None
-            if isinstance(value, datetime):
-                return value.date()
-            if isinstance(value, date):
-                return value
-            if isinstance(value, (int, float)):
-                return from_excel(value).date()
-            if isinstance(value, str):
-                for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y"):
-                    try:
-                        return datetime.strptime(value.strip(), fmt).date()
-                    except ValueError:
-                        pass
-                raise ValueError(f"Unsupported date format: {value}")
-            return value
-
         return EmployeeRecord(
             title=row["Title"],
             name=row["Name"],
             email=row["Email"],
             manager_email=row["Manager Email"],
-            expiration_date=normalize_date(row["Expirary Date"]),
+            expiration_date=self._normalize_date(row["Expirary Date"]),
         )
 
     def _row_to_record(self, row: dict[str, Any]) -> RequestRecord:
@@ -430,3 +426,21 @@ class ExcelRepository:
 
     def _append_audit(self, workbook: Any, request_id: str, actor: str, action: str, details: str) -> None:
         workbook["AuditLog"].append([datetime.now(), request_id, actor, action, details])
+
+    def _normalize_date(self, value: Any) -> date | None:
+        if value in (None, ""):
+            return None
+        if isinstance(value, datetime):
+            return value.date()
+        if isinstance(value, date):
+            return value
+        if isinstance(value, (int, float)):
+            return from_excel(value).date()
+        if isinstance(value, str):
+            for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%m/%d/%y"):
+                try:
+                    return datetime.strptime(value.strip(), fmt).date()
+                except ValueError:
+                    pass
+            raise ValueError(f"Unsupported date format: {value}")
+        return value

@@ -5,7 +5,7 @@ from threading import Lock
 from typing import Any, Callable
 
 from .excel_repository import ExcelRepository
-from .models import RequestRecord
+from .models import ExpirationTarget, RequestRecord
 
 
 class OneDriveRepository:
@@ -59,8 +59,20 @@ class OneDriveRepository:
     def get_request(self, request_id: str) -> RequestRecord | None:
         return self._inner.get_request(request_id)
 
-    def pending_for_reminder(self, days_ahead: int) -> list[RequestRecord]:
-        return self._inner.pending_for_reminder(days_ahead)
+    def pending_for_reminder(self, days_ahead: int, expiration_filter: str | None = None) -> list[ExpirationTarget]:
+        return self._inner.pending_for_reminder(days_ahead, expiration_filter)
+
+    def find_target_by_key(self, target_key: str) -> ExpirationTarget | None:
+        return self._inner.find_target_by_key(target_key)
+
+    def list_employees(self):
+        return self._inner.list_employees()
+
+    def last_reminder_for_target(self, target_key: str):
+        return self._inner.last_reminder_for_target(target_key)
+
+    def last_sent_for_target(self, target: ExpirationTarget):
+        return self._inner.last_sent_for_target(target)
 
     def audit_rows(self) -> list[dict[str, Any]]:
         return self._inner.audit_rows()
@@ -91,19 +103,23 @@ class OneDriveRepository:
 
     def record_reminder(
         self,
-        request_id: str,
+        target: ExpirationTarget,
         recipient: str,
         subject: str,
         message_preview: str,
         channel: str,
         status: str,
-        escalate: bool,
     ) -> None:
         with self._sync_lock:
             self._inner.record_reminder(
-                request_id, recipient, subject, message_preview,
-                channel, status, escalate,
+                target, recipient, subject, message_preview,
+                channel, status,
             )
+            self._upload_fn(self._cache_path)
+
+    def record_reminder_request(self, target: ExpirationTarget, recipient: str, subject: str, channel: str) -> None:
+        with self._sync_lock:
+            self._inner.record_reminder_request(target, recipient, subject, channel)
             self._upload_fn(self._cache_path)
 
     # ------------------------------------------------------------------

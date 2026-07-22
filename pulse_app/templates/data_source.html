@@ -8,23 +8,45 @@
   </div>
 </section>
 
-<section class="form-band single">
+<section class="form-band">
   <form method="post" class="response-form">
-    <input type="hidden" name="action" value="connect">
-    <h2>Connect OneDrive workbook</h2>
-    <p class="muted">Paste a OneDrive Excel sharing link. Pulse downloads the workbook, validates it, and uses the expiration dates for reminder emails.</p>
+    <input type="hidden" name="action" value="connect-public">
+    <h2>Public OneDrive link</h2>
+    <p class="muted">Use this for sharing links that already allow the app to download a copy without signing in.</p>
     <label>
-      OneDrive Excel URL
-      <input type="url" name="onedrive_url" placeholder="https://1drv.ms/x/..." required>
+      Public OneDrive Excel URL
+      <input type="url" name="public_onedrive_url" placeholder="https://1drv.ms/x/..." required>
     </label>
-    <button type="submit">Use OneDrive workbook</button>
+    <button type="submit">Use public workbook</button>
   </form>
 
+  <form method="post" class="response-form">
+    <input type="hidden" name="action" value="start-private-onedrive">
+    <h2>Private OneDrive link</h2>
+    <p class="muted">Use this for links that require Microsoft sign-in. Pulse signs in through Microsoft Graph and downloads the workbook privately.</p>
+    <label>
+      Private OneDrive Excel URL
+      <input type="url" name="private_onedrive_url" placeholder="https://1drv.ms/x/... or SharePoint/OneDrive URL" required>
+    </label>
+    <label>
+      Microsoft app client ID
+      <input type="text" name="graph_client_id" value="{{ graph_status.client_id }}" placeholder="Azure app registration client ID" required>
+    </label>
+    <label>
+      Tenant
+      <input type="text" name="graph_tenant" value="{{ graph_status.tenant or 'common' }}" placeholder="common, consumers, organizations, or tenant ID">
+    </label>
+    <button type="submit">Start Microsoft sign-in</button>
+  </form>
+</section>
+
+<section class="form-band single">
   <div class="panel">
     <h2>Current workbook</h2>
     <pre>{{ workbook_path }}</pre>
     <h2>Saved OneDrive source</h2>
     {% if onedrive_source_url %}
+      <p class="muted">Connection type: {{ onedrive_source_kind.title() }}</p>
       <pre>{{ onedrive_source_url }}</pre>
       <form method="post" class="inline-form">
         <input type="hidden" name="action" value="refresh-onedrive">
@@ -35,6 +57,23 @@
     {% endif %}
     <h2>Required expiration columns</h2>
     <p class="muted">{{ required_headers }}</p>
+  </div>
+
+  <div class="panel">
+    <h2>Private sign-in status</h2>
+    {% if graph_status.pending %}
+      <p class="muted">Microsoft is waiting for sign-in approval.</p>
+      <pre>{{ graph_status.message }}</pre>
+      <form method="post" class="inline-form">
+        <input type="hidden" name="action" value="finish-private-onedrive">
+        <button type="submit">Finish private connection</button>
+      </form>
+    {% elif graph_status.connected %}
+      <p class="muted">Private OneDrive is signed in for this Pulse machine.</p>
+      <p class="muted">Tenant: {{ graph_status.tenant }}</p>
+    {% else %}
+      <p class="muted">Private OneDrive is not signed in yet.</p>
+    {% endif %}
   </div>
 </section>
 {% endblock %}

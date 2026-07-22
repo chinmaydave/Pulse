@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import os
 from pathlib import Path
 
 from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
@@ -7,6 +9,7 @@ from flask import Blueprint, current_app, flash, redirect, render_template, requ
 from .agents import ReminderAgent
 from .email_service import email_service
 from .excel_repository import ExcelRepository, EMPLOYEE_HEADERS
+from .graph_onedrive import GraphAuthPending, complete_device_flow, download_private_workbook, start_device_flow
 from .onedrive_source import download_onedrive_workbook
 from .sender_credentials import (
     clear_gmail_app_password,
@@ -72,6 +75,46 @@ def onedrive_source_path() -> Path:
     return config().upload_dir / "active_onedrive_url.txt"
 
 
+def onedrive_source_meta_path() -> Path:
+    return config().upload_dir / "active_onedrive_source.json"
+
+
+def graph_token_path() -> Path:
+    return config().upload_dir / "graph_token.json"
+
+
+def graph_device_path() -> Path:
+    return config().upload_dir / "graph_device_flow.json"
+
+
+def read_json_file(path: Path) -> dict:
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return {}
+
+
+def write_private_json(path: Path, data: dict) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+
+
+def read_onedrive_source() -> dict:
+    source = read_json_file(onedrive_source_meta_path())
+    if source.get("url"):
+        return source
+    source_url = read_onedrive_source_url()
+    if source_url:
+        return {"kind": "public", "url": source_url}
+    return {"kind": "", "url": ""}
+
+
 def read_onedrive_source_url() -> str:
     source_path = onedrive_source_path()
     if not source_path.exists():
@@ -79,16 +122,41 @@ def read_onedrive_source_url() -> str:
     return source_path.read_text(encoding="utf-8").strip()
 
 
-def activate_onedrive_workbook(source_url: str) -> Path:
+def write_onedrive_source(kind: str, source_url: str) -> None:
+    config().upload_dir.mkdir(parents=True, exist_ok=True)
+    onedrive_source_path().write_text(source_url.strip(), encoding="utf-8")
+    write_private_json(onedrive_source_meta_path(), {"kind": kind, "url": source_url.strip()})
+
+
+def graph_status() -> dict:
+    token = read_json_file(graph_token_path())
+    device = read_json_file(graph_device_path())
+    return {
+        "connected": bool(token.get("refresh_token") or token.get("access_token")),
+        "client_id": token.get("client_id") or device.get("client_id", ""),
+        "tenant": token.get("tenant") or device.get("tenant", "common"),
+        "pending": bool(device.get("device_code")),
+        "user_code": device.get("user_code", ""),
+        "verification_uri": device.get("verification_uri", ""),
+        "message": device.get("message", ""),
+    }
+
+
+def activate_onedrive_workbook(source_url: str, kind: str = "public") -> Path:
     cfg = config()
     cfg.upload_dir.mkdir(parents=True, exist_ok=True)
     uploaded_path = cfg.upload_dir / "onedrive_expirations.xlsx"
     pending_path = cfg.upload_dir / "onedrive_expirations.pending.xlsx"
     pending_path.unlink(missing_ok=True)
-    download_onedrive_workbook(source_url, pending_path)
+    if kind == "private":
+        token_cache = read_json_file(graph_token_path())
+        updated_cache = download_private_workbook(source_url, pending_path, token_cache)
+        write_private_json(graph_token_path(), updated_cache)
+    else:
+        download_onedrive_workbook(source_url, pending_path)
     ExcelRepository.validate_workbook(pending_path)
     pending_path.replace(uploaded_path)
-    onedrive_source_path().write_text(source_url.strip(), encoding="utf-8")
+    write_onedrive_source(kind, source_url)
     set_repository(uploaded_path)
     return uploaded_path
 
@@ -116,12 +184,13 @@ def data_source():
     if request.method == "POST":
         action = request.form.get("action", "connect")
         if action == "refresh-onedrive":
-            source_url = read_onedrive_source_url()
+            source = read_onedrive_source()
+            source_url = source.get("url", "")
             if not source_url:
                 flash("Paste and connect a OneDrive Excel URL before refreshing.", "error")
                 return redirect(url_for("pulse.data_source"))
             try:
-                activate_onedrive_workbook(source_url)
+                activate_onedrive_workbook(source_url, source.get("kind", "public"))
             except Exception as exc:
                 flash(str(exc), "error")
                 return redirect(url_for("pulse.data_source"))
@@ -129,24 +198,69 @@ def data_source():
             flash("OneDrive workbook refreshed from the saved link.", "success")
             return redirect(url_for("pulse.dashboard"))
 
-        source_url = request.form.get("onedrive_url", "").strip()
-        if source_url:
+        if action == "start-private-onedrive":
+            client_id = request.form.get("graph_client_id", "").strip()
+            tenant = request.form.get("graph_tenant", "common").strip() or "common"
+            source_url = request.form.get("private_onedrive_url", "").strip()
+            if not source_url:
+                flash("Paste a private OneDrive Excel URL.", "error")
+                return redirect(url_for("pulse.data_source"))
             try:
-                activate_onedrive_workbook(source_url)
+                device = start_device_flow(client_id, tenant)
             except Exception as exc:
                 flash(str(exc), "error")
                 return redirect(url_for("pulse.data_source"))
 
-            flash("OneDrive workbook connected and activated.", "success")
+            device["client_id"] = client_id
+            device["tenant"] = tenant
+            device["source_url"] = source_url
+            write_private_json(graph_device_path(), device)
+            flash("Microsoft sign-in started. Use the code shown below, then click Finish private connection.", "success")
+            return redirect(url_for("pulse.data_source"))
+
+        if action == "finish-private-onedrive":
+            device = read_json_file(graph_device_path())
+            if not device.get("device_code"):
+                flash("Start Microsoft sign-in before finishing the private connection.", "error")
+                return redirect(url_for("pulse.data_source"))
+            try:
+                token = complete_device_flow(device["client_id"], device["tenant"], device["device_code"])
+                token["client_id"] = device["client_id"]
+                token["tenant"] = device["tenant"]
+                write_private_json(graph_token_path(), token)
+                graph_device_path().unlink(missing_ok=True)
+                activate_onedrive_workbook(device["source_url"], "private")
+            except GraphAuthPending as exc:
+                flash(str(exc), "error")
+                return redirect(url_for("pulse.data_source"))
+            except Exception as exc:
+                flash(str(exc), "error")
+                return redirect(url_for("pulse.data_source"))
+
+            flash("Private OneDrive workbook connected and activated.", "success")
+            return redirect(url_for("pulse.dashboard"))
+
+        source_url = request.form.get("public_onedrive_url", "").strip()
+        if source_url:
+            try:
+                activate_onedrive_workbook(source_url, "public")
+            except Exception as exc:
+                flash(str(exc), "error")
+                return redirect(url_for("pulse.data_source"))
+
+            flash("Public OneDrive workbook connected and activated.", "success")
             return redirect(url_for("pulse.dashboard"))
 
         flash("Paste a OneDrive Excel URL.", "error")
         return redirect(url_for("pulse.data_source"))
 
+    source = read_onedrive_source()
     return render_template(
         "data_source.html",
         workbook_path=repository().workbook_path,
-        onedrive_source_url=read_onedrive_source_url(),
+        onedrive_source_url=source.get("url", ""),
+        onedrive_source_kind=source.get("kind", ""),
+        graph_status=graph_status(),
         required_headers=", ".join(EMPLOYEE_HEADERS),
     )
 
@@ -184,15 +298,20 @@ def reminders():
             results = automatic_agent().run_once()
             flash(f"Automatic agent processed {len(results)} reminder(s).", "success")
         elif target_key == "all":
-            results = agent.send_pending(cfg.reminder_days_ahead)
-            flash(f"Processed {len(results)} pending reminders.", "success")
+            results = agent.send_pending(
+                cfg.reminder_days_ahead,
+                None if expiration_filter == "all" else expiration_filter,
+            )
+            sent_count = sum(1 for result in results if result["status"] == "sent")
+            skipped_count = sum(1 for result in results if result["status"] == "skipped")
+            flash(f"Processed {len(results)} pending reminders: {sent_count} sent, {skipped_count} skipped.", "success")
         else:
             target = repository().find_target_by_key(target_key)
             if target is None:
                 flash(f"Reminder target {target_key} was not found.", "error")
             else:
                 result = agent.send_for_target(target)
-                category = "success" if result["status"] == "sent" else "error"
+                category = "success" if result["status"] in {"sent", "skipped"} else "error"
                 flash(
                     f"Reminder for {target.employee_name} ({target.field_name}): "
                     f"{result['status']} to {result['recipient']}. {result['detail']}",
@@ -216,7 +335,7 @@ def reminders():
         "14": "Expires in 14 days or less",
         "7": "Expires in 7 days or less",
     }.get(expiration_filter, "All expiring records")
-    messages = [(target, agent.build_message(target)) for target in pending]
+    messages = [(target, agent.build_message(target), repository().last_sent_for_target(target)) for target in pending]
     return render_template(
         "reminders.html",
         messages=messages,

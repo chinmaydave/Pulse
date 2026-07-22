@@ -5,7 +5,7 @@ Internal Python development app for managing employee document expiration remind
 The current MVP uses a OneDrive Excel sharing link as the active data source. It provides:
 
 - Excel-backed expiration tracking with `Employees`, `AuditLog`, `ReminderLog`, and `ReminderRequests` sheets
-- OneDrive Excel URL connection and refresh through the web interface
+- Public OneDrive link download and private OneDrive Microsoft Graph sign-in through the web interface
 - Dashboard for expiration counts, overdue records, and reminder queue
 - Manual and automatic expiration reminder preparation
 - Outlook reminder sending from Excel email addresses
@@ -68,10 +68,24 @@ The receiver comes from the `Email` column. The sender comes from the `Manager E
 - Gmail manager senders use Gmail SMTP on Mac and Windows. Pulse asks for that Gmail account's app password on the Reminders page the first time it sees the sender.
 - Non-Gmail manager senders use Outlook desktop. The machine running Pulse must already be signed into Outlook, and Outlook must allow send-on-behalf for that manager mailbox.
 
-Connect the workbook from the web UI:
+Connect the workbook from the web UI.
+
+For public links:
 
 ```text
-Data Source -> Use OneDrive workbook
+Data Source -> Public OneDrive link -> Use public workbook
+```
+
+For private links:
+
+```text
+Data Source -> Private OneDrive link
+Paste the private Excel URL
+Enter a Microsoft app client ID
+Use tenant common, consumers, organizations, or your tenant ID
+Click Start Microsoft sign-in
+Open the Microsoft device login link and enter the code
+Return to Pulse and click Finish private connection
 ```
 
 Workbooks must be `.xlsx` files with an `Employees` sheet and these five columns:
@@ -84,7 +98,7 @@ Manager Email
 Expirary Date
 ```
 
-Pulse adds and maintains reminder/audit sheets in its active workbook copy. Use a OneDrive Excel sharing link that the app can access. Pulse tries normal share links, OneDrive shared-content download URLs, and embedded workbook download URLs. Fully private or sign-in-only OneDrive access should be handled later with Microsoft Graph authentication.
+Pulse adds and maintains reminder/audit sheets in its active workbook copy. Public links use direct download attempts. Private links use Microsoft Graph device-code sign-in and store the delegated token locally on the Pulse machine under `data/uploads/graph_token.json`.
 
 ## MVP Architecture
 
@@ -93,6 +107,7 @@ Pulse adds and maintains reminder/audit sheets in its active workbook copy. Use 
 - `pulse_app/agents.py`: first manual reminder agent implementation
 - `pulse_app/email_service.py`: Excel-routed Gmail/Outlook sender abstraction
 - `pulse_app/onedrive_source.py`: downloads an accessible OneDrive Excel URL into the app
+- `pulse_app/graph_onedrive.py`: signs into Microsoft Graph and downloads private OneDrive workbooks
 - `scripts/create_mock_data.py`: rebuilds the local mock Excel workbook
 
 Future SharePoint, Teams, and autonomous agent work can plug into these boundaries without changing the user-facing workflow.

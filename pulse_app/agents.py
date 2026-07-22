@@ -50,6 +50,18 @@ class ReminderAgent:
         return "Upcoming"
 
     def send_for_target(self, target: ExpirationTarget) -> dict[str, str]:
+        last_sent = self.repository.last_sent_for_target(target)
+        if last_sent:
+            sent_at = last_sent["timestamp"]
+            return {
+                "target_key": target.target_key,
+                "employee_id": target.employee_id,
+                "recipient": target.email,
+                "sender": target.manager_email,
+                "status": "skipped",
+                "detail": f"Already sent at {sent_at}.",
+            }
+
         message = self.build_message(target)
         result = self.mailer.send(message)
         self.repository.record_reminder(
@@ -69,8 +81,11 @@ class ReminderAgent:
             "detail": result.detail,
         }
 
-    def send_pending(self, days_ahead: int) -> list[dict[str, str]]:
-        return [self.send_for_target(target) for target in self.repository.pending_for_reminder(days_ahead)]
+    def send_pending(self, days_ahead: int, expiration_filter: str | None = None) -> list[dict[str, str]]:
+        return [
+            self.send_for_target(target)
+            for target in self.repository.pending_for_reminder(days_ahead, expiration_filter)
+        ]
 
     def due_for_automatic_send(
         self,

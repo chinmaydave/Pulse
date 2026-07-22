@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
 
 from .agents import ReminderAgent
 from .email_service import email_service
@@ -16,6 +16,42 @@ from .sender_credentials import (
 
 
 bp = Blueprint("pulse", __name__)
+ADMIN_USERNAME = "admin"
+ADMIN_PASSWORD = "pulse-admin"
+
+
+@bp.before_app_request
+def require_login():
+    if request.endpoint in {"static", "pulse.login"}:
+        return None
+    if session.get("authenticated"):
+        return None
+    return redirect(url_for("pulse.login", next=request.full_path if request.query_string else request.path))
+
+
+@bp.route("/login", methods=["GET", "POST"])
+def login():
+    if session.get("authenticated"):
+        return redirect(request.args.get("next") or url_for("pulse.dashboard"))
+
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "")
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            session["authenticated"] = True
+            session["username"] = username
+            flash("Signed in.", "success")
+            return redirect(request.args.get("next") or url_for("pulse.dashboard"))
+        flash("Invalid username or password.", "error")
+
+    return render_template("login.html")
+
+
+@bp.post("/logout")
+def logout():
+    session.clear()
+    flash("Signed out.", "success")
+    return redirect(url_for("pulse.login"))
 
 
 def repository():
@@ -113,48 +149,6 @@ def data_source():
         onedrive_source_url=read_onedrive_source_url(),
         required_headers=", ".join(EMPLOYEE_HEADERS),
     )
-
-
-@bp.route("/requests")
-def requests_index():
-    status = request.args.get("status", "")
-    associate = request.args.get("associate", "")
-    records = repository().list_requests()
-    if status:
-        records = [record for record in records if record.status == status]
-    if associate:
-        records = [record for record in records if associate.lower() in record.assigned_to.lower()]
-    return render_template("requests.html", records=records, status=status, associate=associate)
-
-
-@bp.route("/requests/<request_id>", methods=["GET", "POST"])
-def request_detail(request_id: str):
-    record = repository().get_request(request_id)
-    if record is None:
-        flash(f"Request {request_id} was not found.", "error")
-        return redirect(url_for("pulse.requests_index"))
-
-    if request.method == "POST":
-        submitted_value = request.form.get("submitted_value", "").strip()
-        notes = request.form.get("notes", "").strip()
-        actor = request.form.get("actor", record.assigned_to).strip() or record.assigned_to
-        if not submitted_value:
-            flash("Submitted value is required.", "error")
-            return render_template("request_detail.html", record=record)
-        repository().submit_response(request_id, submitted_value, notes, actor)
-        flash(f"{request_id} was submitted and written back to Excel.", "success")
-        return redirect(url_for("pulse.request_detail", request_id=request_id))
-
-    return render_template("request_detail.html", record=record)
-
-
-@bp.post("/requests/<request_id>/status")
-def update_status(request_id: str):
-    status = request.form.get("status", "")
-    actor = request.form.get("actor", "manager").strip() or "manager"
-    repository().update_status(request_id, status, actor, f"Manual status update from web portal.")
-    flash(f"{request_id} status updated to {status}.", "success")
-    return redirect(url_for("pulse.request_detail", request_id=request_id))
 
 
 @bp.route("/reminders", methods=["GET", "POST"])

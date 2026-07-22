@@ -10,11 +10,15 @@
     <header class="topbar">
       <a class="brand" href="{{ url_for('pulse.dashboard') }}">Pulse</a>
       <nav>
-        <a href="{{ url_for('pulse.dashboard') }}">Dashboard</a>
-        <a href="{{ url_for('pulse.data_source') }}">Data Source</a>
-        <a href="{{ url_for('pulse.requests_index') }}">Requests</a>
-        <a href="{{ url_for('pulse.reminders') }}">Reminders</a>
-        <a href="{{ url_for('pulse.reports') }}">Reports</a>
+        {% if session.get("authenticated") %}
+          <a class="{{ 'active' if request.endpoint == 'pulse.dashboard' else '' }}" href="{{ url_for('pulse.dashboard') }}">Dashboard</a>
+          <a class="{{ 'active' if request.endpoint == 'pulse.data_source' else '' }}" href="{{ url_for('pulse.data_source') }}">Data Source</a>
+          <a class="{{ 'active' if request.endpoint == 'pulse.reminders' else '' }}" href="{{ url_for('pulse.reminders') }}">Reminders</a>
+          <a class="{{ 'active' if request.endpoint == 'pulse.reports' else '' }}" href="{{ url_for('pulse.reports') }}">Reports</a>
+          <form method="post" action="{{ url_for('pulse.logout') }}" class="logout-form">
+            <button type="submit">Logout</button>
+          </form>
+        {% endif %}
       </nav>
     </header>
 
